@@ -16,6 +16,8 @@ Why does this file exist, and why not put this in __main__?
 """
 import sys
 
+#import producers
+#import consumers
 
 def main(argv=sys.argv):
     """
@@ -27,6 +29,6 @@ def main(argv=sys.argv):
 
     Does stuff.
     """
-
+    #producers.Tailer().process(consumers.StdOut())
     print(argv)
     return 0
