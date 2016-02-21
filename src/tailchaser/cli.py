@@ -28,6 +28,6 @@ def main(argv=sys.argv):
 
     Does stuff.
     """
- 
+
     print(argv)
     return 0
