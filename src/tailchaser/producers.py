@@ -3,7 +3,7 @@ Module that contains the the chaser (collector) classes.
 
 """
 
-import sys, pprint,os,shutil, time, pickle
+import os, time, pickle
 import argparse, glob
 
 FORMAT = '%(asctime)s %(levelname)s  %(module)s %(process)d %(thread)d %(message)s'
