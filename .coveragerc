@@ -1,0 +1,14 @@
+[paths]
+source =
+   src/tailchaser
+   */site-packages/tailchaser
+
+[run]
+branch = True
+source = tailchaser
+parallel = true
+
+[report]
+show_missing = true
+precision = 2
+omit = *migrations*
