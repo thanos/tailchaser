@@ -17,6 +17,7 @@ Why does this file exist, and why not put this in __main__?
 import sys
 from producers import Tailer
 
+
 def main(argv=sys.argv):
     """
 
@@ -29,5 +30,5 @@ def main(argv=sys.argv):
     Does stuff.
     """
 
-    Tailer(sys.argv[1], verbose=True) #.tail()
+    Tailer(sys.argv[1], verbose=True)  # .tail()
     return 0

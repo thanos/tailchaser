@@ -20,6 +20,10 @@ lib
 lib64
 venv*/
 pyvenv*/
+src/tailchaser/-verbosecheckpoint
+src/tailchaser/logscheckpoint
+src/tailchaser/testoutput
+
 
 # Installer logs
 pip-log.txt

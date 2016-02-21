@@ -1,6 +1,8 @@
 import logging.handlers
-import logging,threading
-import sys, pprint,os,shutil, time
+import logging
+import sys
+import os
+import time
 import argparse
 
 FORMAT = '%(asctime)s %(levelname)s  %(module)s %(process)d %(thread)d %(message)s'
