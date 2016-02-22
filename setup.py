@@ -57,7 +57,7 @@ setup(
         'Topic :: Utilities',
     ],
     keywords=[
-        # eg: 'keyword1', 'keyword2', 'keyword3',
+         'tail', 'watch', 'logs',
     ],
     install_requires=[
         'slugify>=0.0.1',
