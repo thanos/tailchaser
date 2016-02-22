@@ -2,14 +2,14 @@ import argparse
 import logging
 import logging.handlers
 import os
-
+import random
+import tempfile
 import time
-
 
 FORMAT = '%(asctime)s %(levelname)s  %(module)s %(process)d %(thread)d %(message)s'
 LOGNUM = 1
 MAX_LOGS_PER_DIR = max(LOGNUM / 10, 1)
-MAX_LOG_SIZE = 2**20
+MAX_LOG_SIZE = 2 ** 20
 MSG_SIZE = 100
 MAX_LOG_ENTRIES = MAX_LOG_SIZE
 
@@ -41,17 +41,29 @@ def get_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
-    import random
-    args = get_args()
-    abs_path = os.path.abspath(args.path_head)
+def generate_logfiles(log_file_name, record_number=1024, max_log_size=10*1024, backup_count=20, write_delay=.1,
+                      tmp_dir=True):
+    abs_file_name = os.path.abspath(log_file_name)
+    abs_path, log_file_name = os.path.split(abs_file_name)
+    if tmp_dir:
+        abs_path = tempfile.mkdtemp(prefix='tailchaser')
+        abs_file_name = os.path.join(abs_path, log_file_name)
+    print 'abs_file_name', abs_file_name
     if not os.path.exists(abs_path):
         os.makedirs(abs_path)
+
     logger = logging.getLogger()
-    log_file = os.path.join(abs_path, "test.log")
-    handler = logging.handlers.RotatingFileHandler(log_file, maxBytes=400 * 1024, backupCount=20)
-    handler.setFormatter(logging.Formatter(args.format))
+    handler = logging.handlers.RotatingFileHandler(abs_file_name, maxBytes=max_log_size, backupCount=backup_count)
+    handler.setFormatter(logging.Formatter(FORMAT))
     logger.addHandler(handler)
-    for i in xrange(10**6):
-        logger.error("%d - %s", i + 1, "X" * 128)
-        time.sleep(random.uniform(.1, 1))
+    count = 0
+    while count < record_number:
+        count += 1
+        logger.error("%d - %s", count, "X" * 20)
+        time.sleep(random.uniform(0, write_delay))
+
+
+if __name__ == '__main__':
+    import sys
+
+    generate_logfiles(sys.argv[1])
