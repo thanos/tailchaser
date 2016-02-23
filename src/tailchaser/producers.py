@@ -44,10 +44,10 @@ class Tailer(Producer):
         self.checkpoint_filename = self.make_checkpoint_filename(self.args.source_pattern)
 
     def handoff(self, file_tailed, checkpoint, record):
-        # if self.args.verbose:
-        #    path = os.path.join('testoutput', os.path.basename(file_tailed))
-            # open(path, 'a').write(record)
-        print file_tailed, checkpoint, record
+        if self.args.verbose:
+            self.console(file_tailed, checkpoint, record)
+        else:
+            sys.stdout.write(record)
         return record
 
     @staticmethod
@@ -89,9 +89,11 @@ class Tailer(Producer):
 
     def load_checkpoint(self, checkpoint_filename):
         try:
+            if self.args.verbose:
+                print 'loding'
             sig, mtime, offset = cPickle.load(open(checkpoint_filename))
             if self.args.verbose:
-                self.console('loading', checkpoint_filename, (sig, mtime, offset))
+                self.console('loaded', checkpoint_filename, (sig, mtime, offset))
             return sig, mtime, offset
         except (IOError, EOFError, ValueError):
             return '', 0, 0
@@ -174,8 +176,9 @@ class Tailer(Producer):
 
     @classmethod
     def cli(cls, argv=sys.argv):
+        print argv
         arg_parse = cls.add_arguments()
-        Tailer(**vars(arg_parse.parse_args(argv))).tail()
+        Tailer(**vars(arg_parse.parse_args(argv[1:]))).tail()
 
     @staticmethod
     def console(*args):

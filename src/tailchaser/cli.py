@@ -30,5 +30,5 @@ def main(argv=sys.argv):
     Does stuff.
     """
 
-    Tailer(sys.argv[1], verbose=True)  # .tail()
+    Tailer.cli(argv)
     return 0
