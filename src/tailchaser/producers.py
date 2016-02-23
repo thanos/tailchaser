@@ -9,6 +9,7 @@ import cPickle
 import glob
 import hashlib
 import logging
+import logging.handlers
 import os
 import pprint
 import random
@@ -41,30 +42,30 @@ def slugify(value):
 class LogGenerator(Producer):
     FORMAT = '%(asctime)s %(levelname)s  %(module)s %(process)d %(thread)d %(message)s'
     MSG_SIZE = 128
-    RECORD_NUMBER = 1024
-    MAX_LOG_SIZE = 10 * 1024
+    RECORD_NUMBER = 10 * 1024
+    MAX_LOG_SIZE = 1024 * 128
     BACKUP_COUNT = 20
     WRITE_DELAY = 0.1
     TMP_DIR = False
 
     def __init__(self, log_file_name, record_number=RECORD_NUMBER, max_log_size=MAX_LOG_SIZE, backup_count=BACKUP_COUNT,
-                 write_delay=WRITE_DELAY, msg_size=MSG_SIZE,
-                 tmp_dir=TMP_DIR, format=FORMAT):
-        self.args = namedtuple('Args', 'log_file_name', 'record_number', 'max_log_size', 'backup_count', 'write_delay',
-                               'tmp_dir', 'format', 'tmp_dir', 'msg_size')
+                 write_delay=WRITE_DELAY, message_size=MSG_SIZE,
+                 tmp_dir=TMP_DIR, log_format=FORMAT):
+        self.args = namedtuple('Args', ['log_file_name', 'record_number', 'max_log_size', 'backup_count', 'write_delay',
+                                        'tmp_dir', 'log_format', 'message_size'])
         self.args.log_file_name = log_file_name
         self.args.record_number = record_number
         self.args.max_log_size = max_log_size
         self.args.backup_count = backup_count
         self.args.write_delay = write_delay
         self.args.tmp_dir = tmp_dir
-        self.args.format = format
+        self.args.log_format = log_format
         self.args.tmp_dir = tmp_dir
-        self.args.msg_size = msg_size
+        self.args.message_size = message_size
 
     def run(self):
         abs_file_name = os.path.abspath(self.args.log_file_name)
-        abs_path, log_file_name = os.path.split(self.args.abs_file_name)
+        abs_path, log_file_name = os.path.split(abs_file_name)
         if self.args.tmp_dir:
             abs_path = tempfile.mkdtemp(prefix='tailchaser')
             abs_file_name = os.path.join(abs_path, log_file_name)
@@ -74,14 +75,16 @@ class LogGenerator(Producer):
         logger = logging.getLogger()
         handler = logging.handlers.RotatingFileHandler(abs_file_name, maxBytes=self.args.max_log_size,
                                                        backupCount=self.args.backup_count)
-        handler.setFormatter(logging.Formatter(self.args.format))
+        handler.setFormatter(logging.Formatter(self.args.log_format))
         logger.addHandler(handler)
         count = 0
         write_delay = self.args.write_delay
+        msg = 'X' * self.args.message_size
         while count < self.args.record_number:
             count += 1
-            logger.error("%d - %s", count, "X" * 20)
+            logger.error("%d - %s", count, msg)
             time.sleep(random.uniform(0, write_delay))
+        return os.path.join(abs_path, '*')
 
     @classmethod
     def add_arguments(cls, parser=None):
@@ -101,7 +104,7 @@ class LogGenerator(Producer):
                                 help='max log entries (0= unlimited) : %s' % cls.BACKUP_COUNT)
             parser.add_argument('--write_delay', type=float, default=cls.WRITE_DELAY,
                                 help='max log entries (0= unlimited) : %s' % cls.WRITE_DELAY)
-            parser.add_argument('--format', default=cls.FORMAT, help='flog foromat, default: %s' % cls.FORMAT),
+            parser.add_argument('--log_format', default=cls.FORMAT, help='flog foromat, default: %s' % cls.FORMAT),
             parser.add_argument('--tmp_dir', action='store_true', default=cls.TMP_DIR,
                                 help='dry runs, default is: %s' % cls.TMP_DIR)
 
@@ -110,15 +113,23 @@ class LogGenerator(Producer):
     @classmethod
     def cli(cls, argv=sys.argv):
         arg_parse = cls.add_arguments()
-        cls(**vars(arg_parse.parse_args(argv[1:]))).run()
+        return cls(**vars(arg_parse.parse_args(argv[1:]))).run()
 
 
 class Tailer(Producer):
-    def __init__(self, source_pattern, verbose=False, follow=True, dryrun=False, backfill=True):
-        self.args = namedtuple('Args', 'source_pattern', 'verbose', 'follow')
+    VERBOSE = False
+    DONT_FOLLOW = False
+    DRYRUN = False
+    DONT_BACKFILL = False
+
+    def __init__(self, source_pattern, verbose=VERBOSE, dont_follow=DONT_FOLLOW, dryrun=DRYRUN,
+                 dont_backfill=DONT_BACKFILL):
+        self.args = namedtuple('Args', ['source_pattern', 'verbose', 'dont_follow', 'dryrun', 'dont_backfill'])
         self.args.source_pattern = source_pattern
         self.args.verbose = verbose
-        self.args.follow = follow
+        self.args.dont_follow = dont_follow
+        self.args.dryrun = dryrun
+        self.args.dont_backfill = dont_backfill
         self.checkpoint_filename = self.make_checkpoint_filename(self.args.source_pattern)
 
     def handoff(self, file_tailed, checkpoint, record):
@@ -205,7 +216,7 @@ class Tailer(Producer):
                     self.handoff(file_to_tail, checkpoint, record)
                     checkpoint = checkpoint[0], checkpoint[1], offset
                     self.save_checkpoint(self.checkpoint_filename, checkpoint)
-                if not to_tail:
+                if self.args.dont_follow and not to_tail:
                     return
             except KeyboardInterrupt:
                 return
@@ -213,7 +224,7 @@ class Tailer(Producer):
                 import traceback
                 traceback.print_exc()
             finally:
-                self.save_checkpoint(self.checkpoint_filename, checkpoint)
+                pass  # self.save_checkpoint(self.checkpoint_filename, checkpoint)
             time.sleep(5)
 
     def process(self, filename, (sig, st_mtime, offset)):
@@ -244,18 +255,23 @@ class Tailer(Producer):
                                              )
         parser.add_argument('source_pattern',
                             help='source pattern is the glob path to a file to be tailed plus its rotated versions')
-        parser.add_argument('--verbose', action='store_true', default=False,
-                            help='prints a lot crap, default is: %s' % False)
-        parser.add_argument('--dryrun', action='store_true', default=False,
-                            help='prints a lot crap and no hand-off, default is: %s' % False)
-        parser.add_argument('--backfill', action='store_true', default=True,
-                            help='backfill with rolled logs, default is: %s' % True)
+        parser.add_argument('--verbose', action='store_true', default=cls.VERBOSE,
+                            help='prints a lot crap, default is: %s' % cls.VERBOSE)
+        parser.add_argument('--dryrun', action='store_true', default=cls.DRYRUN,
+                            help='prints a lot crap and no hand-off, default is: %s' % cls.DRYRUN)
+        parser.add_argument('--dont_backfill', action='store_true', default=cls.DONT_BACKFILL,
+                            help='don\'t backfill with rolled logs, default is: %s' % cls.DONT_BACKFILL)
+        parser.add_argument('--dont_follow', action='store_true', default=cls.DONT_FOLLOW,
+                            help='don\'t follow when you reach the end of the file exit, default is: %s'
+                                 % cls.DONT_FOLLOW)
         return parser
 
     @classmethod
     def cli(cls, argv=sys.argv):
         arg_parse = cls.add_arguments()
-        cls(**vars(arg_parse.parse_args(argv[1:]))).run()
+        args = vars(arg_parse.parse_args(argv[1:]))
+        print args
+        return cls(**args).run()
 
     @staticmethod
     def console(*args):
