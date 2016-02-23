@@ -8,10 +8,13 @@ import argparse
 import cPickle
 import glob
 import hashlib
+import logging
 import os
 import pprint
+import random
 import re
 import sys
+import tempfile
 import time
 from collections import namedtuple
 
@@ -33,6 +36,81 @@ def slugify(value):
     """
     value = re.sub('[^\w\s-]', '', value).strip().lower()
     return re.sub('[-\s]+', '-', value)
+
+
+class LogGenerator(Producer):
+    FORMAT = '%(asctime)s %(levelname)s  %(module)s %(process)d %(thread)d %(message)s'
+    MSG_SIZE = 128
+    RECORD_NUMBER = 1024
+    MAX_LOG_SIZE = 10 * 1024
+    BACKUP_COUNT = 20
+    WRITE_DELAY = 0.1
+    TMP_DIR = False
+
+    def __init__(self, log_file_name, record_number=RECORD_NUMBER, max_log_size=MAX_LOG_SIZE, backup_count=BACKUP_COUNT,
+                 write_delay=WRITE_DELAY, msg_size=MSG_SIZE,
+                 tmp_dir=TMP_DIR, format=FORMAT):
+        self.args = namedtuple('Args', 'log_file_name', 'record_number', 'max_log_size', 'backup_count', 'write_delay',
+                               'tmp_dir', 'format', 'tmp_dir', 'msg_size')
+        self.args.log_file_name = log_file_name
+        self.args.record_number = record_number
+        self.args.max_log_size = max_log_size
+        self.args.backup_count = backup_count
+        self.args.write_delay = write_delay
+        self.args.tmp_dir = tmp_dir
+        self.args.format = format
+        self.args.tmp_dir = tmp_dir
+        self.args.msg_size = msg_size
+
+    def run(self):
+        abs_file_name = os.path.abspath(self.args.log_file_name)
+        abs_path, log_file_name = os.path.split(self.args.abs_file_name)
+        if self.args.tmp_dir:
+            abs_path = tempfile.mkdtemp(prefix='tailchaser')
+            abs_file_name = os.path.join(abs_path, log_file_name)
+        if not os.path.exists(abs_path):
+            os.makedirs(abs_path)
+
+        logger = logging.getLogger()
+        handler = logging.handlers.RotatingFileHandler(abs_file_name, maxBytes=self.args.max_log_size,
+                                                       backupCount=self.args.backup_count)
+        handler.setFormatter(logging.Formatter(self.args.format))
+        logger.addHandler(handler)
+        count = 0
+        write_delay = self.args.write_delay
+        while count < self.args.record_number:
+            count += 1
+            logger.error("%d - %s", count, "X" * 20)
+            time.sleep(random.uniform(0, write_delay))
+
+    @classmethod
+    def add_arguments(cls, parser=None):
+        if not parser:
+            parser = argparse.ArgumentParser(description='the ultimate tail chaser',
+                                             prog='tailer',
+                                             usage='%(prog)s [options] source_pattern'
+                                             )
+            parser.add_argument('log_file_name', help='path to store log files')
+            parser.add_argument('--message_size', type=int, default=cls.MSG_SIZE,
+                                help='message size: %s' % cls.MSG_SIZE)
+            parser.add_argument('--record_number', type=int, default=cls.RECORD_NUMBER,
+                                help='max log size before you rotate: %s' % cls.RECORD_NUMBER)
+            parser.add_argument('--max_log_size', type=int, default=cls.MAX_LOG_SIZE,
+                                help='max log size before you rotate: %s' % cls.MAX_LOG_SIZE)
+            parser.add_argument('--backup_count', type=int, default=cls.BACKUP_COUNT,
+                                help='max log entries (0= unlimited) : %s' % cls.BACKUP_COUNT)
+            parser.add_argument('--write_delay', type=float, default=cls.WRITE_DELAY,
+                                help='max log entries (0= unlimited) : %s' % cls.WRITE_DELAY)
+            parser.add_argument('--format', default=cls.FORMAT, help='flog foromat, default: %s' % cls.FORMAT),
+            parser.add_argument('--tmp_dir', action='store_true', default=cls.TMP_DIR,
+                                help='dry runs, default is: %s' % cls.TMP_DIR)
+
+        return parser
+
+    @classmethod
+    def cli(cls, argv=sys.argv):
+        arg_parse = cls.add_arguments()
+        cls(**vars(arg_parse.parse_args(argv[1:]))).run()
 
 
 class Tailer(Producer):
@@ -103,7 +181,7 @@ class Tailer(Producer):
             self.console('dumping', checkpoint_filename, checkpoint)
         return cPickle.dump(checkpoint, open(checkpoint_filename, 'wb'))
 
-    def tail(self):
+    def run(self):
         checkpoint = self.load_checkpoint(self.checkpoint_filename)
         while True:
             try:
@@ -176,9 +254,8 @@ class Tailer(Producer):
 
     @classmethod
     def cli(cls, argv=sys.argv):
-        print argv
         arg_parse = cls.add_arguments()
-        Tailer(**vars(arg_parse.parse_args(argv[1:]))).tail()
+        cls(**vars(arg_parse.parse_args(argv[1:]))).run()
 
     @staticmethod
     def console(*args):
