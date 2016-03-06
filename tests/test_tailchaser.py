@@ -1,3 +1,4 @@
+import os
 
 from tailchaser.cli import main, main_loggenerator
 from tailchaser.producers import LogGenerator, Tailer
@@ -9,15 +10,15 @@ def test_loggenerator():
 
 
 def test_tailer():
-    pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=1024', '--message_size=64',
-                                 '--max_log_size=2048', '--tmp_dir'])
+    pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=256', '--message_size=64',
+                                '--max_log_size=1048', '--tmp_dir'])
+    #os.unlink(Tailer.make_checkpoint_filename(pattern))
     assert main(['tests', pattern, '--dont_follow']) == 0
-
 
 
 def test_tailer_verbose():
     pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=256', '--message_size=32',
-                               '--max_log_size=1024',  '--tmp_dir', ])
+                               '--max_log_size=1024', '--tmp_dir', ])
     # class FTailer(Tailer):
     #  FOLLOW = False
     # Tailer.cli(['tests', pattern, '--follow'])

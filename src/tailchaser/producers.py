@@ -84,6 +84,7 @@ class LogGenerator(Producer):
         abs_path, log_file_name = os.path.split(abs_file_name)
         if self.args.tmp_dir:
             abs_path = tempfile.mkdtemp(prefix='tailchaser')
+            print >>sys.stderr, (abs_path)
             abs_file_name = os.path.join(abs_path, log_file_name)
         if not os.path.exists(abs_path):
             os.makedirs(abs_path)
@@ -179,7 +180,7 @@ class Tailer(Producer):
 
     def should_tail(self, file_to_check, checkpoint):
         if self.args.verbose:
-            self.console('should_tail', file_to_check, checkpoint)
+            self.console('testing', file_to_check, checkpoint)
         stat = os.stat(file_to_check)
         if self.args.verbose:
             self.console(stat)
@@ -188,13 +189,14 @@ class Tailer(Producer):
             if self.args.verbose:
                 self.console('No Checkpoint')
             return file_to_check, (sig, stat.st_ctime, 0)
-        if self.args.verbose:
-            self.console('should_tail', file_to_check, checkpoint, sig == checkpoint[0])
-        if sig == checkpoint[0] and checkpoint[2] < stat.st_size:
-            retval = file_to_check, checkpoint
-            if self.args.verbose:
-                self.console('SIG the same', retval)
-            return retval
+        if sig == checkpoint[0]:
+            if checkpoint[2] < stat.st_size:
+                retval = file_to_check, checkpoint
+                if self.args.verbose:
+                    self.console('SIG the same', retval)
+                return retval
+            else:
+                return
         if stat.st_mtime > checkpoint[1]:
             if self.args.verbose:
                 self.console(" Younger", file_to_check, (sig, stat.st_mtime, 0))
@@ -232,8 +234,11 @@ class Tailer(Producer):
                                                for file_to_check in glob.glob(self.args.source_pattern)),
                                               key=lambda x: x[1][1] if x else x))
                 if not to_tail:
-                    time.sleep(10)
-                    continue
+                    if self.args.dont_follow:
+                        return
+                    else:
+                        time.sleep(10)
+                        continue
                 if self.args.verbose:
                     print "to_tailto_tail"
                     pprint.pprint(to_tail)
@@ -250,10 +255,9 @@ class Tailer(Producer):
                     self.handoff(file_to_tail, checkpoint, record)
                     checkpoint = checkpoint[0], checkpoint[1], offset
                     self.save_checkpoint(self.checkpoint_filename, checkpoint)
-                if self.args.dont_follow and not to_tail:
-                    return
+
             except KeyboardInterrupt:
-                return
+                raise
             except:
                 import traceback
                 traceback.print_exc()
@@ -307,7 +311,3 @@ class Tailer(Producer):
         parser.add_argument('--read_pause', type=float, default=cls.READ_PAUSE,
                             help='time to pause between reads, default: %s' % cls.READ_PAUSE)
         return parser
-
-
-if __name__ == '__main__':
-    Tailer.cli()
