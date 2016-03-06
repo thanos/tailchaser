@@ -57,10 +57,9 @@ setup(
         'Topic :: Utilities',
     ],
     keywords=[
-         'tail', 'watch', 'logs',
+        'tail', 'watch', 'logs',
     ],
     install_requires=[
-        'slugify>=0.0.1',
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
     ],
     extras_require={
@@ -71,6 +70,7 @@ setup(
     entry_points={
         'console_scripts': [
             'tailchaser = tailchaser.cli:main',
+            'log_generator = tailchaser.cli:main_loggenerator'
         ]
     },
 )

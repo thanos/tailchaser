@@ -15,7 +15,8 @@ Why does this file exist, and why not put this in __main__?
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
 import sys
-from producers import Tailer
+
+from producers import LogGenerator, Tailer
 
 
 def main(argv=sys.argv):
@@ -31,4 +32,20 @@ def main(argv=sys.argv):
     """
 
     Tailer.cli(argv)
+    return 0
+
+
+def main_loggenerator(argv=sys.argv):
+    """
+
+    Args:
+        argv (list): List of arguments
+
+    Returns:
+        int: A return code
+
+    Does stuff.
+    """
+
+    LogGenerator.cli(argv)
     return 0

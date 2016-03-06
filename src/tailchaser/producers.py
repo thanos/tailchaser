@@ -25,6 +25,22 @@ class Producer(object):
 
     """
 
+    @classmethod
+    def cli(cls, argv=sys.argv):
+        arg_parse = cls.add_arguments()
+        args = vars(arg_parse.parse_args(argv[1:]))
+        # return cls(**args).run()
+        # pool = Pool(processes=args['workers'])
+        # if len(args[cls.ARGS_TAG]):
+        #   return cls(**args).run()
+        # pool.map()
+
+        return cls(**args).run()
+
+    @staticmethod
+    def console(*args):
+        print >> sys.stderr, args
+
 
 SIG_SZ = 256
 
@@ -80,9 +96,11 @@ class LogGenerator(Producer):
         count = 0
         write_delay = self.args.write_delay
         msg = 'X' * self.args.message_size
+        ticks = time.time()
         while count < self.args.record_number:
             count += 1
             logger.error("%d - %s", count, msg)
+            print time.ctime(), count, count / (time.time() - ticks)
             time.sleep(random.uniform(0, write_delay))
         return os.path.join(abs_path, '*')
 
@@ -121,22 +139,34 @@ class Tailer(Producer):
     DONT_FOLLOW = False
     DRYRUN = False
     DONT_BACKFILL = False
+    READ_PERIOD = 1.0
+    CLEAR_CHECKPOINT = False
+    READ_PAUSE = 0
 
     def __init__(self, source_pattern, verbose=VERBOSE, dont_follow=DONT_FOLLOW, dryrun=DRYRUN,
-                 dont_backfill=DONT_BACKFILL):
-        self.args = namedtuple('Args', ['source_pattern', 'verbose', 'dont_follow', 'dryrun', 'dont_backfill'])
+                 dont_backfill=DONT_BACKFILL, read_period=READ_PERIOD, clear_checkpoint=CLEAR_CHECKPOINT,
+                 read_pause=READ_PAUSE):
+        self.args = namedtuple('Args',
+                               ['source_pattern', 'verbose', 'dont_follow', 'dryrun', 'dont_backfill', 'read_period',
+                                'clear_checkpoint', 'read_pause'])
         self.args.source_pattern = source_pattern
         self.args.verbose = verbose
         self.args.dont_follow = dont_follow
         self.args.dryrun = dryrun
         self.args.dont_backfill = dont_backfill
+        self.args.read_period = read_period
+        self.args.clear_checkpoint = clear_checkpoint
+        self.args.read_pause = read_pause
         self.checkpoint_filename = self.make_checkpoint_filename(self.args.source_pattern)
+        self.stats = (time.time(), 0)
 
     def handoff(self, file_tailed, checkpoint, record):
         if self.args.verbose:
             self.console(file_tailed, checkpoint, record)
         else:
             sys.stdout.write(record)
+            # self.stats = self.stats[0], self.stats[1] + 1
+            # self.console(file_tailed, checkpoint, record, self.stats[1]/(time.time() - self.stats[0]))
         return record
 
     @staticmethod
@@ -178,8 +208,10 @@ class Tailer(Producer):
 
     def load_checkpoint(self, checkpoint_filename):
         try:
+            if self.args.clear_checkpoint:
+                return '', 0, 0
             if self.args.verbose:
-                print 'loding'
+                print 'loading'
             sig, mtime, offset = cPickle.load(open(checkpoint_filename))
             if self.args.verbose:
                 self.console('loaded', checkpoint_filename, (sig, mtime, offset))
@@ -203,6 +235,7 @@ class Tailer(Producer):
                     time.sleep(10)
                     continue
                 if self.args.verbose:
+                    print "to_tailto_tail"
                     pprint.pprint(to_tail)
                     self.console('checkpoint', checkpoint)
                 if self.args.verbose:
@@ -211,8 +244,9 @@ class Tailer(Producer):
                     time.sleep(5)
                 file_to_tail, checkpoint = to_tail[0]
                 to_tail = to_tail[1:]
-
-                for offset, record in self.process(file_to_tail, checkpoint):
+                ticks = time.time()
+                while time.time() - ticks < self.args.read_period:
+                    offset, record = self.process(file_to_tail, checkpoint).next()
                     self.handoff(file_to_tail, checkpoint, record)
                     checkpoint = checkpoint[0], checkpoint[1], offset
                     self.save_checkpoint(self.checkpoint_filename, checkpoint)
@@ -225,7 +259,7 @@ class Tailer(Producer):
                 traceback.print_exc()
             finally:
                 pass  # self.save_checkpoint(self.checkpoint_filename, checkpoint)
-            time.sleep(5)
+            time.sleep(self.args.read_pause)
 
     def process(self, filename, (sig, st_mtime, offset)):
         with open(filename, 'rb') as file_to_tail:
@@ -236,15 +270,16 @@ class Tailer(Producer):
             if self.args.verbose:
                 self.console(file_to_tail.tell())
             # raw_input()
-            while True:
-                record = self.read_record(file_to_tail)
-                if not record:
-                    break
-                else:
-                    yield file_to_tail.tell(), record
+            for offset, record in self.read_record(file_to_tail):
+                yield offset, record
 
     def read_record(self, file_to_tail):
-        return file_to_tail.readline()
+        bytes = file_to_tail.tell()
+        for record in file_to_tail:
+            bytes += len(record)
+            yield bytes, record
+
+    ARGS_TAG = 'source_pattern'
 
     @classmethod
     def add_arguments(cls, parser=None):
@@ -253,7 +288,7 @@ class Tailer(Producer):
                                              prog='tailer',
                                              usage='%(prog)s [options] source_pattern'
                                              )
-        parser.add_argument('source_pattern',
+        parser.add_argument(cls.ARGS_TAG,  # nargs='+',
                             help='source pattern is the glob path to a file to be tailed plus its rotated versions')
         parser.add_argument('--verbose', action='store_true', default=cls.VERBOSE,
                             help='prints a lot crap, default is: %s' % cls.VERBOSE)
@@ -264,18 +299,14 @@ class Tailer(Producer):
         parser.add_argument('--dont_follow', action='store_true', default=cls.DONT_FOLLOW,
                             help='don\'t follow when you reach the end of the file exit, default is: %s'
                                  % cls.DONT_FOLLOW)
+        parser.add_argument('--clear_checkpoint', action='store_true', default=cls.CLEAR_CHECKPOINT,
+                            help='clears the checkpoint and lets you start from the begining, default:%s'
+                                 % cls.CLEAR_CHECKPOINT)
+        parser.add_argument('--read_period', type=float, default=cls.READ_PERIOD,
+                            help='time given to read, default: %s' % cls.READ_PERIOD)
+        parser.add_argument('--read_pause', type=float, default=cls.READ_PAUSE,
+                            help='time to pause between reads, default: %s' % cls.READ_PAUSE)
         return parser
-
-    @classmethod
-    def cli(cls, argv=sys.argv):
-        arg_parse = cls.add_arguments()
-        args = vars(arg_parse.parse_args(argv[1:]))
-        print args
-        return cls(**args).run()
-
-    @staticmethod
-    def console(*args):
-        print(args)
 
 
 if __name__ == '__main__':
