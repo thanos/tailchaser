@@ -160,6 +160,10 @@ class Tailer(Producer):
         self.args.read_pause = read_pause
         self.checkpoint_filename = self.make_checkpoint_filename(self.args.source_pattern)
         self.stats = (time.time(), 0)
+        self.startup()
+
+    def startup(self):
+        pass
 
     def handoff(self, file_tailed, checkpoint, record):
         if self.args.verbose:
