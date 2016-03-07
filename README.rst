@@ -10,7 +10,7 @@ Overview
     * - docs
       - |docs|
     * - tests
-      - | |travis| |appveyor| |requires|
+      - | |travis|  |requires|
         | |codecov|
     * - package
       - |version| |downloads| |wheel| |supported-versions| |supported-implementations|
