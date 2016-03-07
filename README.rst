@@ -73,6 +73,33 @@ Installation
 Usage
 =====
 
+::
+    $ tailchaser /wher/my/logs/*.log
+    
+    $ tailchaser -h
+
+usage: tailer [options] source_pattern
+
+the ultimate tail chaser
+
+positional arguments:
+  source_pattern        source pattern is the glob path to a file to be tailed
+                        plus its rotated versions
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --verbose             prints a lot crap, default is: False
+  --dryrun              prints a lot crap and no hand-off, default is: False
+  --dont_backfill       don't backfill with rolled logs, default is: False
+  --dont_follow         don't follow when you reach the end of the file exit,
+                        default is: False
+  --clear_checkpoint    clears the checkpoint and lets you start from the
+                        begining, default:False
+  --read_period READ_PERIOD
+                        time given to read, default: 1.0
+  --read_pause READ_PAUSE
+                        time to pause between reads, default: 0
+
 
 To use tailchaser in a project::
 
