@@ -14,7 +14,7 @@ To use tailchaser in a project::
 
     import tailchaser
 
-    class TailToElastic(tailchaser.Tailer):
+    class TailToElastic(tailchaser.producers.Tailer):
         def handoff(self, file_tailed, checkpoint, record):
             """ Expect a record like:
 
@@ -43,7 +43,7 @@ To use tailchaser in a project::
     import tailchaser
     from kafka import KafkaProducer
 
-    class TailToKafka(tailchaser.Tailer):
+    class TailToKafka(tailchaser.producers.Tailer):
         def add_arguments(cls, parser=None):
             parser = super(TailToKafka, cls).add_arguments(parser)
 
@@ -60,7 +60,7 @@ To use tailchaser in a project::
             20160204 10:28:15,541 INFO PropertiesLoaderSupport - Loading properties file from URL [file:C:/WaterWorks/Broken/BSE//config/default-database.properties]
             20160204 10:28:15,541 INFO PropertiesLoaderSupport - Loading properties file from URL [file:C:/WaterWorks/Broken/BSE//config/default-hibernate.properties]
             """
-            self.kafka_producer.send(self.TOPIC, message)
+            self.kafka_producer.send(self.TOPIC, record)
 
      
 
