@@ -73,7 +73,7 @@ Installation
 Usage
 =====
 
- ::
+ -::
     $ tailchaser /wher/my/logs/*.log
     
     $ tailchaser -h
