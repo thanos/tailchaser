@@ -4,7 +4,6 @@
 
 """
 
-import argparse
 import binascii
 import glob
 import gzip
@@ -19,8 +18,6 @@ import sys
 import tempfile
 import time
 
-from collections import namedtuple
-from multiprocessing import Pool, cpu_count
 
 import six
 
@@ -55,22 +52,22 @@ class Tailer(object):
     READ_PAUSE = 0
     TMP_DIR = None
     ONLY_BACKFILL = False
-  
+
     def __init__(self,
                  only_backfill=ONLY_BACKFILL,
                  dont_backfill=DONT_BACKFILL,
                  read_period=READ_PERIOD,
                  clear_checkpoint=CLEAR_CHECKPOINT,
                  read_pause=READ_PAUSE,
-                 temp_dir =  TMP_DIR):
-      
+                 temp_dir=TMP_DIR):
+
         self.config = Args()
         self.config.dont_backfill = dont_backfill
         self.config.only_backfill = only_backfill
         self.config.clear_checkpoint = clear_checkpoint
         self.config.read_period = read_period
         self.config.read_pause = read_pause
-        self.config.temp_dir = temp_dir if temp_dir else tempfile.mkdtemp() 
+        self.config.temp_dir = temp_dir if temp_dir else tempfile.mkdtemp()
 
     def startup(self):
         pass
@@ -82,43 +79,41 @@ class Tailer(object):
         pass
 
     def run(self, source_pattern, receiver):
-      self.config.checkpoint_filename = self.make_checkpoint_filename(source_pattern)
-      self.startup()
-      file_info = 'Not Assigned'
-      try:
-        while True:
-          ticks = time.time()
-          try:
-              checkpoint = self.load_checkpoint()
-              is_backfill_file_info = self.next_to_process(source_pattern, checkpoint)
-              if is_backfill_file_info:
-                is_backfill, file_info = is_backfill_file_info
-                if file_info:
-                    if is_backfill or self.config.only_backfill:
-                      producer = self.backfill(file_info)
-                    else:
-                      producer = self.tail(file_info)
-                    for file_checkpoint_record in producer:
-                      receiver.send(file_checkpoint_record)
-                      self.save_checkpoint(file_checkpoint_record[1])
-                      if not is_backfill and self.config.read_period:
-                        time_spent = time.time() - ticks
-                        if time_spent > self.config.read_period:
-                          time.sleep(self.config.read_pause)
-                          break
-#                     else:
-#                         for record in self.tail(file_info):
-#                             receiver.send(record)
-#                         else:
-#                             time.sleep(1)
-#                             break
-          except KeyboardInterrupt:
-              raise
-          except:
-              raise
-          time.sleep(1)
-      finally:
-         self.shutdown()
+        self.config.checkpoint_filename = self.make_checkpoint_filename(source_pattern)
+        if self.config.clear_checkpoint and os.path.exists(self.config.checkpoint_filename):
+            os.unlink(self.config.checkpoint_filename)
+        self.startup()
+        file_info = 'Not Assigned'
+        try:
+            while True:
+                ticks = time.time()
+                try:
+                    checkpoint = self.load_checkpoint()
+                    is_backfill_file_info = self.next_to_process(source_pattern, checkpoint)
+                    if is_backfill_file_info:
+                        is_backfill, file_info = is_backfill_file_info
+                        if file_info:
+                            if is_backfill or self.config.only_backfill:
+                                producer = self.backfill(file_info)
+                            else:
+                                producer = self.tail(file_info)
+                            for file_checkpoint_record in producer:
+                                receiver.send(file_checkpoint_record)
+                                self.save_checkpoint(file_checkpoint_record[1])
+                                if not is_backfill and self.config.read_period:
+                                    time_spent = time.time() - ticks
+                                    if time_spent > self.config.read_period:
+                                        time.sleep(self.config.read_pause)
+                                        break
+                    elif self.config.only_backfill:
+                        break
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    raise
+                time.sleep(1)
+        finally:
+            self.shutdown()
 
     def next_to_process(self, source_pattern, checkpoint):
         log.debug("next_to_process: %s %s", source_pattern, checkpoint)
@@ -126,7 +121,7 @@ class Tailer(object):
         with_stats.sort(key=lambda x: x[1].st_mtime)
         file_info = None
         log.debug("with_stats: %s", [f[0] for f in with_stats])
-        #sys.exit()
+        # sys.exit()
         while with_stats:
             log.debug("with_stats: %s", with_stats)
             (file_name, file_stat) = with_stats[0]
@@ -137,7 +132,7 @@ class Tailer(object):
         log.debug("file_info: %s", file_info)
         if file_info:
             if with_stats:
-                new_file = os.path.join(self.temp_dir, str(file_info[1][0]))
+                new_file = os.path.join(self.config.temp_dir, str(file_info[1][0]))
                 self.copy(file_info[0], new_file)
                 file_info = new_file, file_info[1]
                 return True, file_info
@@ -150,21 +145,21 @@ class Tailer(object):
         log.debug('stat: %s', stat)
         retval = None
         if not checkpoint:
-          log.debug("%s - no checkpoint", file_to_check)
-          retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
+            log.debug("%s - no checkpoint", file_to_check)
+            retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
         else:
             if checkpoint_mtime < stat.st_mtime:
-              log.debug("%s -- newer than checkpoint %s %s", file_to_check, checkpoint_mtime, stat.st_mtime)
-              retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
+                log.debug("%s -- newer than checkpoint %s %s", file_to_check, checkpoint_mtime, stat.st_mtime)
+                retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
             else:
-              sig = self.make_sig(file_to_check, stat)
-              if sig == checkpoint_sig:
-                log.debug("%s --- same as checkpoint", file_to_check)
-                if checkpoint_offset < stat.st_size:
-                  log.debug("%s ---- size changed since  checkpoint", file_to_check)
-                  retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, checkpoint_offset)
-                elif checkpoint[2] == stat.st_size:
-                  log.debug('same sig and size: %d', checkpoint_offset)
+                sig = self.make_sig(file_to_check, stat)
+                if sig == checkpoint_sig:
+                    log.debug("%s --- same as checkpoint", file_to_check)
+                    if checkpoint_offset < stat.st_size:
+                        log.debug("%s ---- size changed since  checkpoint", file_to_check)
+                        retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, checkpoint_offset)
+                    elif checkpoint[2] == stat.st_size:
+                        log.debug('same sig and size: %d', checkpoint_offset)
         return retval
 
     def backfill(self, file_info):
@@ -174,12 +169,12 @@ class Tailer(object):
             if not record:
                 break
             yield file_to_process, (sig, st_mtime, offset), record
-           
+
     def tail(self, file_info):
         file_to_process, (sig, st_mtime, offset) = file_info
         log.debug("tail: %s %s", file_to_process, offset)
         while True:
-            offset, record = self.process(file_to_process, sig, st_mtime, offset).next()
+            offset, record = six.next(self.process(file_to_process, sig, st_mtime, offset))
             if record:
                 yield file_to_process, (sig, st_mtime, offset), record
             else:
@@ -226,12 +221,10 @@ class Tailer(object):
     def load_checkpoint(self):
         checkpoint_filename = self.config.checkpoint_filename
         try:
-            if self.config.clear_checkpoint:
-                return '', 0, 0
-            sig, mtime, offset = pickle.load(open(checkpoint_filename))
+            sig, mtime, offset = pickle.load(open(checkpoint_filename, 'rb'))
             log.debug('loaded: %s %s', checkpoint_filename, (sig, mtime, offset))
             return sig, mtime, offset
-        except (IOError, EOFError, ValueError):
+        except (IOError, EOFError):
             log.debug('failed to load: %s', checkpoint_filename)
             return '', 0, 0
 
@@ -241,17 +234,16 @@ class Tailer(object):
 
 
 if __name__ == '__main__':
-    import sys
-
     def fx():
         while True:
             record = yield()
             six.print_(record)
+
     def gx():
-      while True:
-        record = yield()
-        open(os.path.basename(record[0])+'.2', 'ab').write(record[2])
+        while True:
+            record = yield()
+            open(os.path.basename(record[0]) + '.2', 'ab').write(record[2])
     f = gx()
     f.send(None)
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
-    Tailer().run(sys.argv[1], f)
+    Tailer(only_backfill=True, clear_checkpoint=True).run(sys.argv[1], f)

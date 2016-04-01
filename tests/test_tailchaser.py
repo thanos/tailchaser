@@ -1,7 +1,13 @@
+import logging
 import os
 
-from tailchaser.cli import main, main_loggenerator
-from tailchaser.producers import LogGenerator, Tailer
+import six
+
+from tailchaser.cli import main_loggenerator
+# from tailchaser.producers import LogGenerator
+from tailchaser.tailer import Tailer
+
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 
 def test_loggenerator():
@@ -10,17 +16,21 @@ def test_loggenerator():
 
 
 def test_tailer():
-    pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=256', '--message_size=64',
-                                '--max_log_size=1048', '--tmp_dir'])
-    #os.unlink(Tailer.make_checkpoint_filename(pattern))
-    assert main(['tests', pattern, '--dont_follow']) == 0
+    # pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=256', '--message_size=64',
+    #                            '--max_log_size=1048', '--tmp_dir'])
 
+    def fx():
+        while True:
+            record = yield()
+            six.print_(record)
 
-def test_tailer_verbose():
-    pattern = LogGenerator.cli(['tests', 'test.log', '--record_number=256', '--message_size=32',
-                               '--max_log_size=1024', '--tmp_dir', ])
-    # class FTailer(Tailer):
-    #  FOLLOW = False
-    # Tailer.cli(['tests', pattern, '--follow'])
-    Tailer.cli(['tests', pattern, '--verbose', '--dont_follow'])
-    assert 0 == 0  # main([]) == 0
+    def gx():
+        while True:
+            record = yield()
+            open(os.path.basename(record[0]) + '.2', 'ab').write(record[2])
+    f = fx()
+    f.send(None)
+    Tailer(only_backfill=True, clear_checkpoint=True).run('/var/log/opendirectoryd*', f)
+
+    # os.unlink(Tailer.make_checkpoint_filename(pattern))
+    # assert main(['tests', pattern, '--dont_follow']) == 0

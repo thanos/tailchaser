@@ -175,8 +175,6 @@ class Tailer(Producer):
 
         self.startup()
 
-
-
     def startup(self):
         pass
 
