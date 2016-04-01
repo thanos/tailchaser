@@ -22,6 +22,8 @@ import time
 from collections import namedtuple
 from multiprocessing import Pool, cpu_count
 
+log = logging.getLogger(__name__)
+
 
 class Producer(object):
     """Base producer class.
@@ -83,7 +85,8 @@ class LogGenerator(Producer):
         abs_path, log_file_name = os.path.split(abs_file_name)
         if self.args.tmp_dir:
             abs_path = tempfile.mkdtemp(prefix='tailchaser')
-            self.logger.info("tmp dir: %s", abs_path)
+            log.info("tmp dir: %s", abs_path)
+
             abs_file_name = os.path.join(abs_path, log_file_name)
         if not os.path.exists(abs_path):
             os.makedirs(abs_path)
@@ -100,7 +103,7 @@ class LogGenerator(Producer):
         while count < self.args.record_number:
             count += 1
             log_gen.debug("%d - %s", count, msg)
-            self.logger.debug("count: %d, rate: %0.02f", count, count / (time.time() - ticks))
+            log.debug("count: %d, rate: %0.02f", count, count / (time.time() - ticks))
             time.sleep(random.uniform(0, write_delay))
         return os.path.join(abs_path, '*')
 
@@ -166,9 +169,13 @@ class Tailer(Producer):
         self.args.workers = workers
         self.args.log_config = log_config
         self.stats = (time.time(), 0)
+
         self.temp_dir = tempfile.mkdtemp()
         self.records_sent = 0
-        # signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+        self.startup()
+
+
 
     def startup(self):
         pass
@@ -231,6 +238,7 @@ class Tailer(Producer):
 
     def should_tail(self, file_to_check, checkpoint):
         self.logger.debug('testing %s == %s', file_to_check, checkpoint)
+
         stat = os.stat(file_to_check)
         self.logger.debug('stat: %s', stat)
         sig = self.make_sig(file_to_check, stat)
@@ -248,6 +256,7 @@ class Tailer(Producer):
                 self.logger.debug('same sig and size')
             else:
                 self.logger.error('same sig but now smaller  %s %s %s', file_to_check, checkpoint[2], stat.st_size)
+
                 return
         if stat.st_mtime > checkpoint[1]:
             self.logger.debug("Younger: %s %s", file_to_check, (sig, stat.st_mtime, 0))
@@ -297,6 +306,7 @@ class Tailer(Producer):
                     # if self.args.dont_follow:
                     #    return
                     # else:
+
                     time.sleep(5)
                     continue
                 file_to_tail, checkpoint = to_process[0]
