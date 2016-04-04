@@ -23,6 +23,7 @@ pyvenv*/
 src/tailchaser/-verbosecheckpoint
 src/tailchaser/logscheckpoint
 src/tailchaser/testoutput
+tmp
 
 
 # Installer logs

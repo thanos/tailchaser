@@ -61,7 +61,8 @@ setup(
     ],
     install_requires=[
         # 'aspectlib==1.1.1',
-        'six>=1.7',
+        'six',
+        'flake8',
     ],
     extras_require={
         # eg:

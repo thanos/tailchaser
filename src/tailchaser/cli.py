@@ -14,12 +14,17 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
+import argparse
+import logging
 import sys
 
-from producers import LogGenerator, Tailer
+from producers import LogGenerator
+from tailer import Tailer
+
+log = logging.getLogger(__name__)
 
 
-def main(argv=sys.argv):
+def main(argv=sys.argv, consumer=None):
     """
 
     Args:
@@ -30,8 +35,43 @@ def main(argv=sys.argv):
 
     Does stuff.
     """
+    # print argv
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('file-pattern',
+                        help='file pattern to tail, such as /var/log/access.*')
+    parser.add_argument('--only-backfill', action='store_true', default=Tailer.ONLY_BACKFILL,
+                        help='dont\'t tail, default: %s' % Tailer.ONLY_BACKFILL)
+    parser.add_argument('--dont-backfill', action='store_true', default=Tailer.DONT_BACKFILL,
+                        help='basically only tail, default: %s' % Tailer.DONT_BACKFILL)
+    parser.add_argument('--clear-checkpoint', action='store_true', default=Tailer.CLEAR_CHECKPOINT,
+                        help='start form the begining, default: %s' % Tailer.CLEAR_CHECKPOINT)
+    parser.add_argument('--read-period', type=int, default=Tailer.READ_PERIOD,
+                        help='how long you read before you pause. If zero you don\'t pause, default: %s' % Tailer.READ_PERIOD)
+    parser.add_argument('--read-pause', type=int, default=Tailer.READ_PAUSE,
+                        help='how long you pause between reads, default: %s' % Tailer.READ_PAUSE)
+    parser.add_argument('--reading-from', choices=['unix', 'win'], default='win',
+                        help='sets how long you rad and then pause, default: win')
+    parser.add_argument('--temp-dir', default=Tailer.TMP_DIR,
+                        help='on backfil files are copied to a temp directory.' +
+                             'Use this to set this directory, default: %s' % Tailer.TMP_DIR)
+    parser.add_argument('--logging', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='ERROR',
+                        help='logging level, default: ERROR')
+    args = vars(parser.parse_args(argv[1:]))
+    file_pattern = args.pop('file-pattern')
+    reading_from = args.pop('reading_from')
+    logging_level = getattr(logging, args.pop('logging'))
 
-    Tailer.cli(argv)
+    if reading_from == 'win':
+        args['read_pause'] = 1
+        args['read_period'] = 1
+    else:
+        args['read_pause'] = 0
+        args['read_period'] = 0
+
+    # print file_pattern, args, logging_level
+    # raw_input()
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=logging_level)
+    Tailer(**args).run(file_pattern, consumer)
     return 0
 
 
