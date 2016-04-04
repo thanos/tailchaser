@@ -72,6 +72,7 @@ class Tailer(object):
         self.config.read_pause = read_pause
         self.config.temp_dir = temp_dir if temp_dir else tempfile.mkdtemp()
         self.state = self.STARTING
+        self.stats = collections.Counter()
 
     def startup(self):
         pass

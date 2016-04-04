@@ -94,7 +94,7 @@ TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 def test_backfill(log_handler=RotatingWithDelayFileHandler):
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
     six.print_('generating log files', tail_from_dir)
-    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), 700)
+    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), 250)
     tail_to_dir = tempfile.mkdtemp(prefix='tail-test_backfill-from_to_dir')
 
     def gx():
@@ -152,8 +152,8 @@ def test_tail():
     tailer = Tailer(only_backfill=False)
     tailer_thread = threading.Thread(target=tailer.run, args=(log_file_path, consumer))
 
-    tailer_lag = 20
-    logger_lag = 40
+    tailer_lag = 40
+    logger_lag = 80
     loggen_thread.join(tailer_lag)
     six.print_('logger run more than %d secs, start tailer' % tailer_lag)
     tailer_thread.start()
@@ -164,11 +164,16 @@ def test_tail():
     loggen_thread.RUNNING = False
     if loggen_thread.is_alive():
         loggen_thread.join()
+    log_files = glob.glob(os.path.join(tmp_dir, '*'))
     six.print_('logger stopped')
     tailer_thread.join(5)
     six.print_('wait for tailer to idle')
-    while tailer.state != tailer.WAITING:
-        pass
+    copy_pattern = os.path.join(copy_dir, '*')
+    while True:
+        six.print_('log files %d == files processed %d' % (len(log_files), len(glob.glob(copy_pattern))))
+        if tailer.state == tailer.WAITING and len(log_files) == len(glob.glob(copy_pattern)):
+            break
+        time.sleep(1)
     six.print_('stop tailer')
     tailer.state = tailer.STOPPED
     tailer_thread.join()
@@ -220,7 +225,7 @@ def test_rotating_log():
     tailer_thread = threading.Thread(target=tailer.run, args=(os.path.join(tmp_dir, '*'), consumer))
 
     tailer_lag = 40
-    logger_run = 80
+    logger_run = 60
     loggen_thread.join(tailer_lag)
     six.print_('logger run more than %d secs, start tailer' % tailer_lag)
     tailer_thread.start()
@@ -231,20 +236,25 @@ def test_rotating_log():
     loggen_thread.RUNNING = False
     if loggen_thread.is_alive():
         loggen_thread.join()
+    log_files = glob.glob(os.path.join(tmp_dir, '*'))
     six.print_('logger stopped')
     tailer_thread.join(5)
     six.print_('wait for tailer to idle')
-    while tailer.state != tailer.WAITING:
-        pass
+    copy_pattern = os.path.join(copy_dir, '*')
+    while True:
+        six.print_('log files %d == files processed %d' % (len(log_files), len(glob.glob(copy_pattern))))
+        if tailer.state == tailer.WAITING and len(log_files) == len(glob.glob(copy_pattern)):
+            break
+        time.sleep(1)
     six.print_('stop tailer')
     tailer.state = tailer.STOPPED
     tailer_thread.join()
     six.print_('tailer stopped')
 
-    for src_file_path in glob.glob(os.path.join(tmp_dir, '*')):
+    for src_file_path in log_files:
         dst_file_path = os.path.join(copy_dir, str(Tailer.make_sig(src_file_path)))
         assert (open(src_file_path).read() == open(dst_file_path).read())
 
 
 if __name__ == '__main__':
-    test_gzip_backfill()
+    test_rotating_log()
