@@ -39,10 +39,6 @@ def slugify(value):
     return re.sub('[-\s]+', '-', value)
 
 
-class Args:
-    pass
-
-
 class Tailer(object):
     VERBOSE = False
     DONT_FOLLOW = False
