@@ -47,7 +47,7 @@ class RotatingWithDelayFileHandler(logging.handlers.RotatingFileHandler):
         return super(RotatingWithDelayFileHandler, self).emit(record)
 
     @classmethod
-    def generate(cls, log_file_path, emits, max_bytes=4096 * 5, backup_count=100):
+    def generate(cls, log_file_path, emits, max_bytes=2096 * 5, backup_count=100):
         count = 0
         logger = logging.getLogger(__file__)
         handler = cls(log_file_path, maxBytes=max_bytes, backupCount=backup_count, encoding=cls.ENCODING)
@@ -94,7 +94,7 @@ TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 def test_backfill(log_handler=RotatingWithDelayFileHandler):
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
     six.print_('generating log files', tail_from_dir)
-    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), 1000)
+    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), 700)
     tail_to_dir = tempfile.mkdtemp(prefix='tail-test_backfill-from_to_dir')
 
     def gx():
@@ -133,7 +133,7 @@ def test_tail():
             super(SimpleLogger, self).__init__()
 
         def emit(self, count):
-            open(log_file_path, 'a').write("%08d. %s\n" % (count, 'x' * 128))
+            open(log_file_path, 'a').write("%08d. %s\n" % (count, 'x' * 64))
             time.sleep(0.1)
 
     loggen_thread = SimpleLogger()
@@ -201,7 +201,7 @@ def test_rotating_log():
             super(RotatingLogger, self).__init__()
 
         def emit(self, count):
-            self.logger.error("%08d. %s", count, 'x' * 128)
+            self.logger.error("%08d. %s", count, 'x' * 64)
 
     loggen_thread = RotatingLogger()
     loggen_thread.start()
