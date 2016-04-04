@@ -154,49 +154,6 @@ class Tailer(object):
                 checkpoint = (checkpoint[0], stat.st_mtime, checkpoint[2])
                 return (pos + 1) != len(with_stats), (file_name, checkpoint)
 
-                #         file_info = None
-                #         log.info("with_stats after sort: %s", [f[0] for f in with_stats])
-                #         #sys.exit()
-                #         while with_stats:
-                #             log.debug("with_stats: %s", with_stats)
-                #             (file_name, file_stat) = with_stats[0]
-                #             with_stats = with_stats[1:]
-                #             file_info = self.should_process(file_name, file_stat, checkpoint)
-                #             if file_info:
-                #                 break
-                #         log.debug("file_info: %s", file_info)
-                #         if file_info:
-                #             if with_stats:
-                #                 new_file = os.path.join(self.config.temp_dir, str(file_info[1][0]))
-                #                 self.copy(file_info[0], new_file)
-                #                 file_info = new_file, file_info[1]
-                #                 return True, file_info
-                #             return False, file_info
-
-    # def should_process(self, file_to_check, stat, checkpoint):
-    #
-    #     checkpoint_sig, checkpoint_mtime, checkpoint_offset = checkpoint
-    #     # stat = os.stat(file_to_check)
-    #     log.info('should_process %s', (file_to_check, stat, checkpoint))
-    #     retval = None
-    #     if not checkpoint:
-    #         log.info("%s - no checkpoint", file_to_check)
-    #         retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
-    #     else:
-    #         if checkpoint_mtime < stat.st_mtime:
-    #             log.info("%s -- newer than checkpoint %s %s", file_to_check, checkpoint_mtime, stat.st_mtime)
-    #             retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, 0)
-    #         else:
-    #             sig = self.make_sig(file_to_check, stat)
-    #             if sig == checkpoint_sig:
-    #                 log.info("%s --- same as checkpoint", file_to_check)
-    #                 if checkpoint_offset < stat.st_size:
-    #                     log.info("%s ---- size changed since  checkpoint", file_to_check)
-    #                     retval = file_to_check, (self.make_sig(file_to_check, stat), stat.st_mtime, checkpoint_offset)
-    #                 elif checkpoint[2] == stat.st_size:
-    #                     log.info('same sig and size: %d', checkpoint_offset)
-    #     return retval
-
     def backfill(self, file_info):
         file_to_process, (sig, st_mtime, offset) = file_info
         log.debug("backfill: %s %s", file_to_process, offset)
@@ -287,19 +244,3 @@ class Tailer(object):
     def save_checkpoint(self, checkpoint):
         log.debug('dumping %s %s', self.config.checkpoint_filename, checkpoint)
         return pickle.dump(checkpoint, open(self.config.checkpoint_filename, 'wb'))
-
-# if __name__ == '__main__':
-#     def fx():
-#         while True:
-#             record = yield ()
-#             six.print_(record)
-#
-#     def gx():
-#         while True:
-#             record = yield ()
-#             open(os.path.basename(record[0]) + '.2', 'ab').write(record[2])
-#
-#     f = gx()
-#     f.send(None)
-#     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
-#     Tailer(only_backfill=True, clear_checkpoint=True).run(sys.argv[1], f)
