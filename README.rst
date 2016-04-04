@@ -63,8 +63,10 @@ The ultimate rotation and windows friendly log tailer plus a lot more...
 - backfills rotated files
 - handles gz and bz2 files
 - handles multi line records
+- doesn't break windows rotating log handlers
 - easy to extend
 - Free software: BSD license
+- other than six pure Python stdlib.
 
 Installation
 ============
