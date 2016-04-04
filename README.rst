@@ -61,14 +61,10 @@ Overview
 The ultimate rotation and windows friendly log tailer plus a lot more...
 
 - backfills rotated files
-
 - handles gz and bz2 files
-
 - handles multi line records
-
 - easy to extend
-
-* Free software: BSD license
+- Free software: BSD license
 
 Installation
 ============
