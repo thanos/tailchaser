@@ -79,27 +79,34 @@ Usage
     
     $ tailchaser -h
 
-usage: tailer [options] source_pattern
+usage: tailchase [-h] [--only-backfill] [--dont-backfill]
+                   [--clear-checkpoint] [--read-period READ_PERIOD]
+                   [--read-pause READ_PAUSE] [--reading-from {unix,win}]
+                   [--temp-dir TEMP_DIR]
+                   [--logging {DEBUG,INFO,WARN,ERROR,CRITICAL}]
+                   file-pattern
 
-the ultimate tail chaser
+Process some integers.
 
 positional arguments:
-  source_pattern        source pattern is the glob path to a file to be tailed
-                        plus its rotated versions
+  file-pattern          file pattern to tail, such as /var/log/access.*
 
 optional arguments:
   -h, --help            show this help message and exit
-  --verbose             prints a lot crap, default is: False
-  --dryrun              prints a lot crap and no hand-off, default is: False
-  --dont_backfill       don't backfill with rolled logs, default is: False
-  --dont_follow         don't follow when you reach the end of the file exit,
-                        default is: False
-  --clear_checkpoint    clears the checkpoint and lets you start from the
-                        begining, default:False
-  --read_period READ_PERIOD
-                        time given to read, default: 1.0
-  --read_pause READ_PAUSE
-                        time to pause between reads, default: 0
+  --only-backfill       dont't tail, default: False
+  --dont-backfill       basically only tail, default: False
+  --clear-checkpoint    start form the begining, default: False
+  --read-period READ_PERIOD
+                        how long you read before you pause. If zero you don't
+                        pause, default: 1
+  --read-pause READ_PAUSE
+                        how long you pause between reads, default: 0
+  --reading-from {unix,win}
+                        sets how long you rad and then pause, default: win
+  --temp-dir TEMP_DIR   on backfil files are copied to a temp directory.Use
+                        this to set this directory, default: None
+  --logging {DEBUG,INFO,WARN,ERROR,CRITICAL}
+                        logging level, default: ERROR
 
 
 To use tailchaser in a project::
