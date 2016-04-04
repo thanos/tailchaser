@@ -66,7 +66,7 @@ setup(
     ],
     extras_require={
         # eg:
-        #   'rst': ['docutils>=0.11'],
+        'rst': ['docutils>=0.11', 'sphinx_rtd_theme'],
         #   ':python_version=="2.6"': ['argparse'],
     },
     entry_points={

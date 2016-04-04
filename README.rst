@@ -58,9 +58,15 @@ Overview
 
 .. end-badges
 
-the ultimate tailer
+The ultimate rotation and windows friendly log tailer plus a lot more...
 
-* Free software: BSD license
+- backfills rotated files
+- handles gz and bz2 files
+- handles multi line records
+- doesn't break windows rotating log handlers
+- easy to extend
+- Free software: BSD license
+- other than six pure Python stdlib.
 
 Installation
 ============
@@ -68,15 +74,15 @@ Installation
 ::
 
     pip install tailchaser
-    
+
 =====
 Usage
 =====
 
 ::
 
-    $ tailchaser /wher/my/logs/*.log
-    
+    $ tailchaser /where/my/logs/*.log
+
     $ tailchaser -h
 
 usage: tailchase [-h] [--only-backfill] [--dont-backfill]
@@ -101,12 +107,12 @@ optional arguments:
                         pause, default: 1
   --read-pause READ_PAUSE
                         how long you pause between reads, default: 0
-  --reading-from {unix,win}
-                        sets how long you rad and then pause, default: win
-  --temp-dir TEMP_DIR   on backfil files are copied to a temp directory.Use
+  --reading-from PLATFORM
+                        sets how long you read and then pause can be one of {unix,win}, default: win
+  --temp-dir TEMP_DIR   on back fill files are copied to a temp directory.Use
                         this to set this directory, default: None
-  --logging {DEBUG,INFO,WARN,ERROR,CRITICAL}
-                        logging level, default: ERROR
+  --logging LEVEL
+                        logging level it can be one of  DEBUG,INFO,WARN,ERROR,CRITICAL, default: ERROR
 
 
 To use tailchaser in a project::
@@ -141,7 +147,7 @@ To use tailchaser in a project::
 
 
     #
-    # Example 2 - Tail to Kafka - shows how to add your own arguments and then send messahes to kafka.
+    # Example 2 - Tail to Kafka - shows how to add your own arguments and then send messages to kafka.
     #
 
 
@@ -157,7 +163,7 @@ To use tailchaser in a project::
         TOPIC = 'log'
         def startup(self):
             self.kafka_producer = KafkaProducer(bootstrap_servers=self.HOSTS,value_serializer=msgpack.dumps)
-            
+
 
         def handoff(self, file_tailed, checkpoint, record):
             """ Expect a record like:
@@ -197,3 +203,4 @@ Note, to combine the coverage data from all the tox environments run:
       - ::
 
             PYTEST_ADDOPTS=--cov-append tox
+

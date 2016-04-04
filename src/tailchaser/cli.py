@@ -29,6 +29,7 @@ def main(argv=sys.argv, consumer=None):
 
     Args:
         argv (list): List of arguments
+        consumer: an optional consumer
 
     Returns:
         int: A return code
@@ -44,9 +45,10 @@ def main(argv=sys.argv, consumer=None):
     parser.add_argument('--dont-backfill', action='store_true', default=Tailer.DONT_BACKFILL,
                         help='basically only tail, default: %s' % Tailer.DONT_BACKFILL)
     parser.add_argument('--clear-checkpoint', action='store_true', default=Tailer.CLEAR_CHECKPOINT,
-                        help='start form the begining, default: %s' % Tailer.CLEAR_CHECKPOINT)
+                        help='start form the beginning, default: %s' % Tailer.CLEAR_CHECKPOINT)
     parser.add_argument('--read-period', type=int, default=Tailer.READ_PERIOD,
-                        help='how long you read before you pause. If zero you don\'t pause, default: %s' % Tailer.READ_PERIOD)
+                        help='how long you read before you pause.' +
+                             'If zero you don\'t pause, default: %s' % Tailer.READ_PERIOD)
     parser.add_argument('--read-pause', type=int, default=Tailer.READ_PAUSE,
                         help='how long you pause between reads, default: %s' % Tailer.READ_PAUSE)
     parser.add_argument('--reading-from', choices=['unix', 'win'], default='win',

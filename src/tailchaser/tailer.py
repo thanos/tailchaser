@@ -7,7 +7,12 @@
 import binascii
 import glob
 import gzip
+
 # import hashlib
+try:
+    import bz2
+except ImportError:
+    bz2 = None
 import logging.handlers
 import os
 import pickle
@@ -16,11 +21,10 @@ import shutil
 import sys
 import tempfile
 import time
-
+import collections
 import six
 
 log = logging.getLogger(__name__)
-xrange = six.moves.xrange
 
 SIG_SZ = 256
 
@@ -54,6 +58,7 @@ class Tailer(object):
     STOPPED = 'STOPPED'
     RUNNING = 'RUNNING'
     WAITING = 'WAITING'
+    ARGS = ('only_backfill', 'dont_backfill', 'read_period', 'clear_checkpoint', 'read_pause', 'temp_dir')
 
     def __init__(self,
                  only_backfill=ONLY_BACKFILL,
@@ -63,7 +68,7 @@ class Tailer(object):
                  read_pause=READ_PAUSE,
                  temp_dir=TMP_DIR):
 
-        self.config = Args()
+        self.config = collections.namedtuple('Args', self.ARGS)
         self.config.dont_backfill = dont_backfill
         self.config.only_backfill = only_backfill
         self.config.clear_checkpoint = clear_checkpoint
@@ -199,12 +204,12 @@ class Tailer(object):
     def backfill(self, file_info):
         file_to_process, (sig, st_mtime, offset) = file_info
         log.debug("backfill: %s %s", file_to_process, offset)
-        file_to_process = os.path.join(self.config.temp_dir, str(file_info[1][0]))
-        self.copy(file_info[0], file_to_process)
-        for offset, record in self.process(file_to_process, sig, st_mtime, offset):
+        copied_file_path = os.path.join(self.config.temp_dir, str(sig))
+        self.copy(file_to_process, copied_file_path)
+        for offset, record in self.process(copied_file_path, sig, st_mtime, offset):
             if not record:
                 break
-            yield file_to_process, (sig, st_mtime, offset), record
+            yield copied_file_path, (sig, st_mtime, offset), record
 
     def tail(self, file_info):
         file_to_process, (sig, st_mtime, offset) = file_info
@@ -215,18 +220,17 @@ class Tailer(object):
                 yield "%d" % self.make_sig(file_to_process), (sig, st_mtime, offset), record
 
     def process(self, filename, sig, st_mtime, offset):
-        with self.open(filename) as file_to_tail:
-            log.debug("seeking: %s %s", filename, offset)
+        with open(filename) as file_to_tail:
+            log.debug("seeking: %s %s %s", filename, offset, sig)
             file_to_tail.seek(offset, 0)
             for offset, record in self.read_record(file_to_tail):
                 yield offset, record
 
     def read_record(self, file_to_tail):
-        bytes = file_to_tail.tell()
+        byte_read = file_to_tail.tell()
         for record in file_to_tail:
-            bytes += len(record)
-            yield bytes, record
-        pass
+            byte_read += len(record)
+            yield byte_read, record
 
     @staticmethod
     def make_checkpoint_filename(source_pattern, path=None):
@@ -237,16 +241,37 @@ class Tailer(object):
             os.makedirs(path)
         return os.path.join(path, os.path.basename(slugify(source_pattern) + '.checkpoint'))
 
-    def open(self, file_name):
+    @classmethod
+    def file_opener(cls, file_name, mode='rb'):
         if file_name.endswith('.gz'):
             log.debug("gzip file: %s", file_name)
-            return gzip.open(file_name, 'rb')
+            return gzip.open(file_name, mode)
+        elif file_name.endswith('.bz2'):
+            if bz2:
+                return bz2.BZ2File(file_name, mode)
+            else:
+                raise NotImplementedError()
         else:
-            return open(file_name, 'rb')
+            return open(file_name, mode)
+
+    # def copy(self, src, dst):
+    #     log.debug("copying: %s to %s", src, dst)
+    #     if src.endswith('.gz'):
+    #         log.debug("gzip file: %s", src)
+    #         with gzip.open(src, 'rb') as src_fh:
+    #             with open(dst, 'wb') as dst_fh:
+    #                 return shutil.copyfileobj(src_fh, dst_fh)
+    #     elif src.endswith('.gz'):
+    #         with bz2.BZ2File(src, 'rb') as src_fh:
+    #             with open(dst, 'wb') as dst_fh:
+    #                 return shutil.copyfileobj(src_fh, dst_fh)
+    #     return shutil.copy2(src, dst)
 
     def copy(self, src, dst):
         log.debug("copying: %s to %s", src, dst)
-        return shutil.copy2(src, dst)
+        with self.file_opener(src, 'rb') as src_fh:
+            with open(dst, 'wb') as dst_fh:
+                return shutil.copyfileobj(src_fh, dst_fh)
 
     @classmethod
     def make_sig(cls, file_to_check, stat=None):
