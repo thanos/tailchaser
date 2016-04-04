@@ -18,7 +18,6 @@ import argparse
 import logging
 import sys
 
-from producers import LogGenerator
 from tailer import Tailer
 
 log = logging.getLogger(__name__)
@@ -74,20 +73,4 @@ def main(argv=sys.argv, consumer=None):
     # raw_input()
     logging.basicConfig(format='%(levelname)s:%(message)s', level=logging_level)
     Tailer(**args).run(file_pattern, consumer)
-    return 0
-
-
-def main_loggenerator(argv=sys.argv):
-    """
-
-    Args:
-        argv (list): List of arguments
-
-    Returns:
-        int: A return code
-
-    Does stuff.
-    """
-
-    LogGenerator.cli(argv)
     return 0

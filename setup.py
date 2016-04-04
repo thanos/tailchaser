@@ -71,8 +71,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'tailchase = tailchaser.cli:main',
-            'log_generator = tailchaser.cli:main_loggenerator'
+            'tailchase = tailchaser.cli:main'
         ]
     },
 )
