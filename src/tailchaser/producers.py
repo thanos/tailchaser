@@ -132,8 +132,6 @@ class LogGenerator(Producer):
 
 # class Args:
 #     pass
-
-
 # class Tailer(Producer):
 #     VERBOSE = False
 #     DONT_FOLLOW = False
@@ -143,7 +141,6 @@ class LogGenerator(Producer):
 #     CLEAR_CHECKPOINT = False
 #     READ_PAUSE = 0
 #     WORKERS = cpu_count()
-
 #     def __init__(self, source_patterns, verbose=VERBOSE, dont_follow=DONT_FOLLOW, dryrun=DRYRUN,
 #                  dont_backfill=DONT_BACKFILL, read_period=READ_PERIOD, clear_checkpoint=CLEAR_CHECKPOINT,
 #                  read_pause=READ_PAUSE, workers=WORKERS, log_config=''):
@@ -162,7 +159,6 @@ class LogGenerator(Producer):
 #         self.args.workers = workers
 #         self.args.log_config = log_config
 #         self.stats = (time.time(), 0)
-
 #         self.temp_dir = tempfile.mkdtemp()
 #         self.records_sent = 0
 
@@ -196,6 +192,7 @@ class LogGenerator(Producer):
 #     def handoff(self, file_tailed, checkpoint, record):
 #         self.logger.info("handoff: %s %s %s", file_tailed, checkpoint, record)
 #         return record
+
 
 #     @staticmethod
 #     def make_checkpoint_filename(source_pattern, path=None):
@@ -247,7 +244,6 @@ class LogGenerator(Producer):
 #                 self.logger.debug('same sig and size')
 #             else:
 #                 self.logger.error('same sig but now smaller  %s %s %s', file_to_check, checkpoint[2], stat.st_size)
-
 #                 return
 #         if stat.st_mtime > checkpoint[1]:
 #             self.logger.debug("Younger: %s %s", file_to_check, (sig, stat.st_mtime, 0))
@@ -287,17 +283,14 @@ class LogGenerator(Producer):
 #                     to_process = filter(None, sorted((self.should_tail(file_to_check, checkpoint)
 #                                                       for file_to_check in glob.glob(source_pattern)),
 #                                                      key=lambda x: x[1][1] if x else x))
-
 #                     to_upload = self.copy_to_tmp(to_process[:-1])
 #                     to_process = to_upload + to_process[-1:]
-
 #                 self.logger.debug("to process: %s", to_process)
 #                 self.logger.debug('checkpoint: %s', checkpoint)
 #                 if not to_process:
 #                     # if self.args.dont_follow:
 #                     #    return
 #                     # else:
-
 #                     time.sleep(5)
 #                     continue
 #                 file_to_tail, checkpoint = to_process[0]

@@ -31,6 +31,7 @@ class RotatingWithDelayFileHandler(logging.handlers.RotatingFileHandler):
     ROLL_DELAY = 10
     EMIT_DELAY = .1
     rolls = 0
+    
     def doRollover(self):
         time.sleep(self.ROLL_DELAY)
         self.rolls +=1
@@ -65,7 +66,6 @@ def test_make_sig():
 
 
 def test_backfill():
-    
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
     print 'generating log files',tail_from_dir
     RotatingWithDelayFileHandler.generate(os.path.join(tail_from_dir,'test.log'), 1000)
@@ -85,7 +85,6 @@ def test_backfill():
     for src_file_path in glob.glob(source_pattern):
         dst_file_path = os.path.join(tail_to_dir, str(Tailer.make_sig(src_file_path)))
         assert (open(src_file_path).read() == open(dst_file_path).read())
-        # print glob.glob(os.path.join(tmp_dir, '*'))
 
 
 #
