@@ -69,9 +69,9 @@ The ultimate rotation and windows friendly log tailer plus a lot more...
 - other than six pure Python stdlib.
 
 Installation
-============
+============ 
 
-    ::
+::
     
     pip install tailchaser
     
@@ -80,7 +80,8 @@ Thsi will install the tailchaser library in your site-packages and it will also 
 
 Usage
 ===== 
-    ::
+   
+::
 
     $ tailchase /where/my/logs/*.log
 
