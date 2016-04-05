@@ -148,12 +148,17 @@ you would get something like ::
     2015-12-24 15:39:56.738794 EST - AID: 0x0000000000000000 - Loaded bundle at path '/System/Library/OpenDirectory/Modules     2015-12-24 15:39:56.740509 EST - AID: 0x0000000000000000 - Loaded bundle at path '/System/Library/OpenDirectory/Modules/
 
 
-Using the tailchaser library
-----------------------------
+Coding with tailchaser
+=====================
 
 
-Using the tailchaser library in a project is probably best done by example ::
+Using the tailchaser library in a project is probably best done by example.
 
+
+Example 1 - Tailchase to a REST service.
+--------------------------------------
+
+::
 
     #
     # Example 1 - Tail to Elastic
@@ -173,21 +178,23 @@ Using the tailchaser library in a project is probably best done by example ::
             """
 
             date, time, level, source, _, message = record.split(5)
-            requests.json("http://someelacticserver.com:9200/myindex/log", json={
+            result = requests.json("http://someelacticserver.com:9200/myindex/log", json={
                             'timestamp': '{}T{}'.format(date, time)
                             'level': level,
                             'source': source,
                             'message': message
                             })
+            return result.status_code == requests.codes.ok
 
 
+Example 2 - Tailchase to  Kafka
+--------------------------------
 
-
+::
+    
     #
     # Example 2 - Tail to Kafka - shows how to add your own arguments and then send messages to kafka.
     #
-
-
     import msgpack
     import tailchaser
     from kafka import KafkaProducer
@@ -209,7 +216,9 @@ Using the tailchaser library in a project is probably best done by example ::
             20160204 10:28:15,541 INFO PropertiesLoaderSupport - Loading properties file from URL [file:C:/WaterWorks/Broken/BSE//config/default-database.properties]
             20160204 10:28:15,541 INFO PropertiesLoaderSupport - Loading properties file from URL [file:C:/WaterWorks/Broken/BSE//config/default-hibernate.properties]
             """
-            self.kafka_producer.send(self.TOPIC, message)
+            self.kafka_producer.send(self.TOPIC, record).get(timeout=10)
+            return True
+             
 
 
 Documentation
