@@ -71,51 +71,88 @@ The ultimate rotation and windows friendly log tailer plus a lot more...
 Installation
 ============
 
-::
-
+    ::
+    
     pip install tailchaser
+    
+Thsi will install the tailchaser library in your site-packages and it will also add the script tailchase to your Scripts directory. 
 
-=====
+
 Usage
-=====
+===== 
+    ::
 
-::
+    $ tailchase /where/my/logs/*.log
 
-    $ tailchaser /where/my/logs/*.log
-
-    $ tailchaser -h
-
-usage: tailchase [-h] [--only-backfill] [--dont-backfill]
+    $ tailchase -h
+    
+    ::
+    
+    usage: tailchase [-h] [--only-backfill] [--dont-backfill]
                    [--clear-checkpoint] [--read-period READ_PERIOD]
                    [--read-pause READ_PAUSE] [--reading-from {unix,win}]
                    [--temp-dir TEMP_DIR]
                    [--logging {DEBUG,INFO,WARN,ERROR,CRITICAL}]
                    file-pattern
 
-Process some integers.
 
-positional arguments:
-  file-pattern          file pattern to tail, such as /var/log/access.*
+    positional arguments:
+      file-pattern          The file pattern to tail, such as /var/log/access.*
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --only-backfill       dont't tail, default: False
-  --dont-backfill       basically only tail, default: False
-  --clear-checkpoint    start form the begining, default: False
-  --read-period READ_PERIOD
+    optional arguments:
+      -h, --help            show this help message and exit
+      --only-backfill       dont't tail, default: False
+      --dont-backfill       basically only tail, default: False
+      --clear-checkpoint    start form the begining, default: False
+      --read-period READ_PERIOD
                         how long you read before you pause. If zero you don't
                         pause, default: 1
-  --read-pause READ_PAUSE
+      --read-pause READ_PAUSE
                         how long you pause between reads, default: 0
-  --reading-from PLATFORM
+      --reading-from PLATFORM
                         sets how long you read and then pause can be one of {unix,win}, default: win
-  --temp-dir TEMP_DIR   on back fill files are copied to a temp directory.Use
+      --temp-dir TEMP_DIR   on back fill files are copied to a temp directory.Use
                         this to set this directory, default: None
-  --logging LEVEL
+      --logging LEVEL
                         logging level it can be one of  DEBUG,INFO,WARN,ERROR,CRITICAL, default: ERROR
 
 
-To use tailchaser in a project::
+
+In its simplest form
+--------------------
+
+In its simplest form tailchase works like a combination of cat and tail -f except it will start with the oldest rotated file. So if you were to have ::
+
+    /var/log/opendirectoryd.log
+    /var/log/opendirectoryd.log.0
+    /var/log/opendirectoryd.log.1
+    /var/log/opendirectoryd.log.2
+    /var/log/opendirectoryd.log.3
+    /var/log/opendirectoryd.log.4
+
+it would first output  the text of /var/log/opendirectoryd.log.4, then /var/log/opendirectoryd.log.3, etc. until it reached the newest file then when it  has reached the end of /var/log/opendirectoryd.log revert to a "tail -f" behaviour.
+
+So if you were to do ::
+    
+    tailchase 'tests/logs/opendirectoryd.*'
+    
+"*note: In bash you need to quote the wildcard otherwise it will be expanded into the scripts argv array.*"
+
+you would get something like ::
+
+    2015-12-24 15:39:56.733754 EST - AID: 0x0000000000000000 - Registered node with name '/Contacts'
+    2015-12-24 15:39:56.733933 EST - AID: 0x0000000000000000 - Registered node with name '/LDAPv3' as hidden
+    2015-12-24 15:39:56.736154 EST - AID: 0x0000000000000000 - Registered node with name '/Local' as hidden
+    2015-12-24 15:39:56.736868 EST - AID: 0x0000000000000000 - Registered node with name '/NIS' as hidden
+    2015-12-24 15:39:56.737134 EST - AID: 0x0000000000000000 - Discovered configuration for node name '/Search' at path '       2015-12-24 15:39:56.737151 EST - AID: 0x0000000000000000 - Registered node with name '/Search'
+    2015-12-24 15:39:56.738794 EST - AID: 0x0000000000000000 - Loaded bundle at path '/System/Library/OpenDirectory/Modules     2015-12-24 15:39:56.740509 EST - AID: 0x0000000000000000 - Loaded bundle at path '/System/Library/OpenDirectory/Modules/
+
+
+Using the tailchaser library
+----------------------------
+
+
+Using the tailchaser library in a project is probably best done by example ::
 
 
     #
