@@ -51,6 +51,8 @@ class RotatingWithDelayFileHandler(logging.handlers.RotatingFileHandler):
         count = 0
         logger = logging.getLogger(__file__)
         handler = cls(log_file_path, maxBytes=max_bytes, backupCount=backup_count, encoding=cls.ENCODING)
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s  %(name)-12s %(message)s')
+        handler.setFormatter(formatter)
         logger.addHandler(handler)
         while count < emits:
             count += 1
@@ -88,33 +90,88 @@ class RotatingGzipFileHandler(RotatingWithDelayFileHandler):
         self.stream = self._open()
 
 
+class MultiLineLogHandler(logging.FileHandler):
+    ROLL_DELAY = 10
+    EMIT_DELAY = .01
+    ENCODING = None
+
+    @classmethod
+    def generate(cls, log_file_path, emits):
+        count = 0
+        logger = logging.getLogger(__file__)
+        handler = cls(log_file_path, encoding=cls.ENCODING)
+        formatter = logging.Formatter('%(asctime)s %(levelname)-8s  %(name)-12s %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        while count < emits:
+            try:
+                count += 1
+                if count % 2 == 0:
+                    raise NameError("error %08d" % count)
+                logger.error("No Exception Thrown: %08d", count)
+            except NameError:
+                logger.exception("Exception Thrown: %08d", count)
+
+
 TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 
+BACKFILL_EMITS = 250
 
-def test_backfill(log_handler=RotatingWithDelayFileHandler):
+
+def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_to_dir=None, vargs=None):
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
     six.print_('generating log files', tail_from_dir)
-    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), 250)
-    tail_to_dir = tempfile.mkdtemp(prefix='tail-test_backfill-from_to_dir')
+    log_handler.generate(os.path.join(tail_from_dir, 'test.log'), BACKFILL_EMITS)
+    if not tail_to_dir:
+        tail_to_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_to_dir')
 
-    def gx():
-        while True:
-            record = yield ()
-            open(os.path.join(tail_to_dir, os.path.basename(record[0])), 'ab').write(record[2])
+    if not consumer:
+        def consumer_gen():
+            while True:
+                record = yield ()
+                open(os.path.join(tail_to_dir, os.path.basename(record[0])), 'ab').write(record[2])
 
-    consumer = gx()
-    consumer.send(None)
+        consumer = consumer_gen()
+        consumer.send(None)
     six.print_('start tailer', tail_to_dir)
-
     source_pattern = os.path.join(tail_from_dir, '*')
-    main([__name__, '--only-backfill', '--clear-checkpoint', source_pattern], consumer)
+    if not vargs:
+        vargs = [__name__, '--only-backfill', '--clear-checkpoint']
+    vargs.append(source_pattern)
+    main(vargs, consumer)
     for src_file_path in glob.glob(source_pattern):
         dst_file_path = os.path.join(tail_to_dir, str(Tailer.make_sig(src_file_path)))
+        six.print_('\ntesting')
+        six.print_(src_file_path)
+        six.print_(dst_file_path)
         assert (Tailer.file_opener(src_file_path).read() == Tailer.file_opener(dst_file_path).read())
+    six.print_('all done', tail_to_dir)
 
 
 def test_gzip_backfill():
     test_backfill(RotatingGzipFileHandler)
+
+
+tailed_records = 0
+
+
+def test_multiline_records():
+    tail_to_dir = tempfile.mkdtemp(prefix='ml')
+
+    def consumer_gen(path):
+        global tailed_records
+        while True:
+            record = yield ()
+            tailed_records += 1
+            open(os.path.join(path, os.path.basename(record[0])), 'ab').write(record[2])
+
+    consumer = consumer_gen(tail_to_dir)
+    consumer.send(None)
+    start_of_record_re = '\d{4}-\d{2}-\d{2}'
+    vargs = [__name__, '--only-backfill', '--clear-checkpoint', "--start-of-record-re=%s" % start_of_record_re]
+    test_backfill(MultiLineLogHandler, consumer, tail_to_dir, vargs=vargs)
+    six.print_('emimitted %d and  tailed %s' % (BACKFILL_EMITS, tail_to_dir))
+    assert (tailed_records == BACKFILL_EMITS)
 
 
 #
@@ -257,4 +314,4 @@ def test_rotating_log():
 
 
 if __name__ == '__main__':
-    test_rotating_log()
+    test_multiline_records()
