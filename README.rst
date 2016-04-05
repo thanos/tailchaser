@@ -87,8 +87,6 @@ Usage
 
     $ tailchase -h
     
-    ::
-    
     usage: tailchase [-h] [--only-backfill] [--dont-backfill]
                    [--clear-checkpoint] [--read-period READ_PERIOD]
                    [--read-pause READ_PAUSE] [--reading-from {unix,win}]
@@ -150,14 +148,14 @@ you would get something like ::
 
 
 Coding with tailchaser
-=====================
+======================
 
 
 Using the tailchaser library in a project is probably best done by example.
 
 
 Example 1 - Tailchase to a REST service.
---------------------------------------
+----------------------------------------
 
 ::
 
@@ -189,7 +187,7 @@ Example 1 - Tailchase to a REST service.
 
 
 Example 2 - Tailchase to  Kafka
---------------------------------
+-------------------------------
 
 ::
     
