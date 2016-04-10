@@ -3,7 +3,7 @@
 .. moduleauthor:: Thanos Vassilakis <thanosv@gmail.com>
 
 """
-
+import argparse
 import binascii
 import glob
 import gzip
@@ -15,8 +15,9 @@ except ImportError:
     bz2 = None
 import logging.handlers
 import os
+import platform
 import pickle
-import re
+import regex
 import shutil
 import sys
 import tempfile
@@ -31,12 +32,16 @@ SIG_SZ = 256
 
 def slugify(value):
     """
+    Parameters
+    ----------
+    value: str
+        the value to slug
     Convert spaces to hyphens.
     Remove characters that aren't alphanumerics, underscores, or hyphens.
     Convert to lowercase. Also strip leading and trailing whitespace.
     """
-    value = re.sub('[^\w\s-]', '', value).strip().lower()
-    return re.sub('[-\s]+', '-', value)
+    value = regex.sub('[^\w\s-]', '', value).strip().lower()
+    return regex.sub('[-\s]+', '-', value)
 
 
 class Tailer(object):
@@ -54,7 +59,8 @@ class Tailer(object):
     STOPPED = 'STOPPED'
     RUNNING = 'RUNNING'
     WAITING = 'WAITING'
-    ARGS = ('only_backfill', 'dont_backfill', 'read_period', 'clear_checkpoint', 'read_pause', 'temp_dir')
+    ARGS = ('only_backfill', 'dont_backfill', 'read_period', 'clear_checkpoint',
+            'read_pause', 'temp_dir', 'start_of_record_re')
 
     def __init__(self,
                  only_backfill=ONLY_BACKFILL,
@@ -62,7 +68,9 @@ class Tailer(object):
                  read_period=READ_PERIOD,
                  clear_checkpoint=CLEAR_CHECKPOINT,
                  read_pause=READ_PAUSE,
-                 temp_dir=TMP_DIR):
+                 temp_dir=TMP_DIR,
+                 start_of_record_re=None,
+                 windows=None):
 
         self.config = collections.namedtuple('Args', self.ARGS)
         self.config.dont_backfill = dont_backfill
@@ -71,6 +79,10 @@ class Tailer(object):
         self.config.read_period = read_period
         self.config.read_pause = read_pause
         self.config.temp_dir = temp_dir if temp_dir else tempfile.mkdtemp()
+        self.config.windows = windows if windows is not None else self.is_windows()
+        if start_of_record_re:
+            self.config.start_of_record_re = regex.compile(start_of_record_re)
+            self.read_record = self.read_record_with_regex
         self.state = self.STARTING
         self.stats = collections.Counter()
 
@@ -95,8 +107,10 @@ class Tailer(object):
                 try:
                     checkpoint = self.load_checkpoint()
                     is_backfill_file_info = self.next_to_process(source_pattern, checkpoint)
+                    print is_backfill_file_info
                     if is_backfill_file_info:
                         is_backfill, file_info = is_backfill_file_info
+                        is_backfill = is_backfill or self.config.only_backfill
                         if file_info:
                             if is_backfill or self.config.only_backfill:
                                 producer = self.backfill(file_info)
@@ -105,7 +119,7 @@ class Tailer(object):
                             for file_tailed, checkpoint, record in producer:
                                 self.handoff(file_tailed, checkpoint, record, receiver)
                                 self.save_checkpoint(checkpoint)
-                                if not is_backfill and self.config.read_period:
+                                if not (self.config.only_backfill or is_backfill) and self.config.read_period:
                                     time_spent = time.time() - ticks
                                     if time_spent > self.config.read_period:
                                         time.sleep(self.config.read_pause)
@@ -116,7 +130,7 @@ class Tailer(object):
                     raise
                 except:
                     raise
-                time.sleep(3)
+                time.sleep(1)
                 self.at_eof()
         finally:
             self.shutdown()
@@ -140,6 +154,8 @@ class Tailer(object):
                     # print 'new file'
                     checkpoint = (sig, stat.st_mtime, 0)
                 else:
+                    if checkpoint[2] == stat.st_size:
+                        continue
                     # print 'same as before'
                     checkpoint = (sig, stat.st_mtime, checkpoint[2])
                 self.state = 'RUNNING'
@@ -149,9 +165,10 @@ class Tailer(object):
                     continue
                 sig = self.make_sig(file_name, stat)
                 if sig == checkpoint[0]:
-                    if self.state == self.RUNNING:
-                        self.state = self.WAITING
-                        return
+                    if stat.st_size == checkpoint[2]:
+                        if self.state == self.RUNNING:
+                            self.state = self.WAITING
+                            return
                 checkpoint = (checkpoint[0], stat.st_mtime, checkpoint[2])
                 return (pos + 1) != len(with_stats), (file_name, checkpoint)
 
@@ -170,10 +187,10 @@ class Tailer(object):
         while True:
             offset, record = six.next(self.process(file_to_process, sig, st_mtime, offset))
             if record:
-                yield "%d" % self.make_sig(file_to_process), (sig, st_mtime, offset), record
+                yield self.make_sig(file_to_process), (sig, st_mtime, offset), record
 
     def process(self, filename, sig, st_mtime, offset):
-        with open(filename) as file_to_tail:
+        with self.file_opener(filename) as file_to_tail:
             log.debug("seeking: %s %s %s", filename, offset, sig)
             file_to_tail.seek(offset, 0)
             for offset, record in self.read_record(file_to_tail):
@@ -219,21 +236,28 @@ class Tailer(object):
     #             with open(dst, 'wb') as dst_fh:
     #                 return shutil.copyfileobj(src_fh, dst_fh)
     #     return shutil.copy2(src, dst)
-
-    def copy(self, src, temp_dir):
+    @classmethod
+    def copy(cls, src, temp_dir):
         log.debug("copying: %s to %s", src, temp_dir)
-        with self.file_opener(src, 'rb') as src_fh:
-            sig = str(binascii.crc32(six.b(src_fh.read(SIG_SZ))) & 0xffffffff)
+        stats = os.stat(src)
+        with cls.file_opener(src, 'rb') as src_fh:
+            sig = cls.sig(src_fh)
             src_fh.seek(0, 0)
             dst = os.path.join(temp_dir, sig)
             with open(dst, 'wb') as dst_fh:
                 shutil.copyfileobj(src_fh, dst_fh)
-                return dst
+        os.utime(dst, (stats.st_ctime, stats.st_mtime))
+        return dst
 
     @classmethod
     def make_sig(cls, file_to_check, stat=None):
-        return binascii.crc32(six.b(open(file_to_check).read(SIG_SZ))) & 0xffffffff
-        # return hashlib.sha224(open(file_to_check).read(SIG_SZ)).hexdigest()
+        with cls.file_opener(file_to_check) as fh:
+            return cls.sig(fh)
+            # return hashlib.sha224(open(file_to_check).read(SIG_SZ)).hexdigest()
+
+    @classmethod
+    def sig(cls, file_to_check_fh, stat=None):
+        return str(binascii.crc32(file_to_check_fh.read(SIG_SZ)) & 0xffffffff)
 
     def load_checkpoint(self):
         checkpoint_filename = self.config.checkpoint_filename
@@ -248,3 +272,89 @@ class Tailer(object):
     def save_checkpoint(self, checkpoint):
         log.debug('dumping %s %s', self.config.checkpoint_filename, checkpoint)
         return pickle.dump(checkpoint, open(self.config.checkpoint_filename, 'wb'))
+
+    def read_record_with_regex(self, file_to_grep):
+        buff = ''
+        first_record = True
+        e = 0
+        s = 0
+        offset = file_to_grep.tell()
+        while True:
+            data = file_to_grep.read(100000)
+            if not data:
+                break
+            buff += data
+
+            while True:
+                match = self.config.start_of_record_re.search(buff, e - s)
+                if not match:
+                    break
+                s, e = match.span(0)
+                if first_record:
+                    first_record = False
+                    continue
+                offset += len(buff[:s])
+                yield offset, buff[:s]
+                buff = buff[s:]
+                if not buff:
+                    break
+        offset += len(buff)
+        yield offset, buff
+
+    @staticmethod
+    def is_windows():
+        return 'win' in platform.system().lower()
+
+    @classmethod
+    def build_arg_parser(cls, parser=None):
+        if not parser:
+            parser = argparse.ArgumentParser(description='Process some integers.')
+        parser.add_argument('--windows', action='store_true', default=Tailer.is_windows(),
+                            help='run as if the platform is windows, default: %s' % Tailer.is_windows())
+        parser.add_argument('file-pattern',
+                            help='file pattern to tail, such as /var/log/access.*')
+        parser.add_argument('--only-backfill', action='store_true', default=Tailer.ONLY_BACKFILL,
+                            help='don\'t tail, default: %s' % Tailer.ONLY_BACKFILL)
+        parser.add_argument('--dont-backfill', action='store_true', default=Tailer.DONT_BACKFILL,
+                            help='basically only tail, default: %s' % Tailer.DONT_BACKFILL)
+        parser.add_argument('--clear-checkpoint', action='store_true', default=Tailer.CLEAR_CHECKPOINT,
+                            help='start form the beginning, default: %s' % Tailer.CLEAR_CHECKPOINT)
+        parser.add_argument('--read-period', type=int, default=Tailer.READ_PERIOD,
+                            help='how long you read before you pause.' +
+                                 'If zero you don\'t pause, default: %s' % Tailer.READ_PERIOD)
+        parser.add_argument('--read-pause', type=int, default=Tailer.READ_PAUSE,
+                            help='how long you pause between reads, default: %s' % Tailer.READ_PAUSE)
+        parser.add_argument('--reading-from', choices=['unix', 'win'], default='win',
+                            help='sets how long you rad and then pause, default: win')
+        parser.add_argument('--temp-dir', default=Tailer.TMP_DIR,
+                            help='on backfil files are copied to a temp directory.' +
+                                 'Use this to set this directory, default: %s' % Tailer.TMP_DIR)
+        parser.add_argument('--logging', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'], default='ERROR',
+                            help='logging level, default: ERROR')
+        parser.add_argument('--start-of-record-re', default=None,
+                            help='use this regex expresion to define the start of a record, default: None')
+        parser.add_argument('--show-config', action='store_true', default=False,
+                            help='dump-configuration')
+        return parser
+
+    @classmethod
+    def cli(cls, argv=sys.argv, parser=None, consumer=None):
+        arg_parser = cls.build_arg_parser(parser)
+        args = vars(arg_parser.parse_args(argv[1:]))
+        file_pattern = args.pop('file-pattern')
+        reading_from = args.pop('reading_from')
+        logging_level = getattr(logging, args.pop('logging'))
+        if reading_from == 'win':
+            args['read_pause'] = 1
+            args['read_period'] = 1
+        else:
+            args['read_pause'] = 0
+            args['read_period'] = 0
+        show_config = args.pop('show_config')
+        tailer = cls(**args)
+        if show_config:
+            import pprint
+            pprint.pprint(vars(tailer.config))
+            return
+        logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging_level)
+        return tailer.run(file_pattern, consumer)

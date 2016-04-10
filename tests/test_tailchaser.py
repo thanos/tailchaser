@@ -1,4 +1,3 @@
-import difflib
 import glob
 import gzip
 import logging
@@ -12,6 +11,18 @@ import six
 
 from tailchaser.cli import main
 from tailchaser.tailer import Tailer
+
+
+def cmp_file(src_file, dst_file):
+    six.print_('testing: ', src_file, dst_file)
+    assert (Tailer.file_opener(src_file, 'rb').read() == Tailer.file_opener(dst_file, 'rb').read())
+
+
+def cmp_files(src_path, dst_path, make_name=os.path.basename):
+    src_files = glob.glob(src_path)
+    for src_file_path in src_files:
+        dst_file_path = os.path.join(dst_path, make_name(src_file_path))
+        cmp_file(src_file_path, dst_file_path)
 
 
 class Logger(threading.Thread):
@@ -31,8 +42,8 @@ class Logger(threading.Thread):
 
 
 class RotatingWithDelayFileHandler(logging.handlers.RotatingFileHandler):
-    ROLL_DELAY = 10
-    EMIT_DELAY = .01
+    ROLL_DELAY = 2
+    EMIT_DELAY = 1
     rolls = 0
     ENCODING = None
 
@@ -47,7 +58,7 @@ class RotatingWithDelayFileHandler(logging.handlers.RotatingFileHandler):
         return super(RotatingWithDelayFileHandler, self).emit(record)
 
     @classmethod
-    def generate(cls, log_file_path, emits, max_bytes=2096 * 5, backup_count=100):
+    def generate(cls, log_file_path, emits, max_bytes=1024, backup_count=100):
         count = 0
         logger = logging.getLogger(__file__)
         handler = cls(log_file_path, maxBytes=max_bytes, backupCount=backup_count, encoding=cls.ENCODING)
@@ -86,7 +97,7 @@ class RotatingGzipFileHandler(RotatingWithDelayFileHandler):
                     df.writelines(sf)
             os.remove(self.baseFilename)
             # print "%s -> %s" % (self.baseFilename, dfn)
-        self.mode = 'w'
+        self.mode = 'wb'
         self.stream = self._open()
 
 
@@ -115,7 +126,7 @@ class MultiLineLogHandler(logging.FileHandler):
 
 TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 
-BACKFILL_EMITS = 250
+BACKFILL_EMITS = 50
 
 
 def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_to_dir=None, vargs=None):
@@ -139,13 +150,12 @@ def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_
         vargs = [__name__, '--only-backfill', '--clear-checkpoint']
     vargs.append(source_pattern)
     main(vargs, consumer)
-    for src_file_path in glob.glob(source_pattern):
-        dst_file_path = os.path.join(tail_to_dir, str(Tailer.make_sig(src_file_path)))
-        six.print_('\ntesting')
-        six.print_(src_file_path)
-        six.print_(dst_file_path)
-        assert (Tailer.file_opener(src_file_path).read() == Tailer.file_opener(dst_file_path).read())
+    cmp_files(source_pattern, tail_to_dir, lambda x: Tailer.make_sig(x))
     six.print_('all done', tail_to_dir)
+    # for src_file_path in glob.glob(source_pattern):
+    #     dst_file_path = os.path.join(tail_to_dir, Tailer.make_sig(src_file_path))
+    #     six.print_("testing:", src_file_path, dst_file_path)
+    #     assert (Tailer.file_opener(src_file_path).read() == Tailer.file_opener(dst_file_path).read())
 
 
 def test_gzip_backfill():
@@ -170,13 +180,13 @@ def test_multiline_records():
     start_of_record_re = '\d{4}-\d{2}-\d{2}'
     vargs = [__name__, '--only-backfill', '--clear-checkpoint', "--start-of-record-re=%s" % start_of_record_re]
     test_backfill(MultiLineLogHandler, consumer, tail_to_dir, vargs=vargs)
-    six.print_('emimitted %d and  tailed %s' % (BACKFILL_EMITS, tail_to_dir))
-    assert (tailed_records == BACKFILL_EMITS)
+    six.print_('emimitted %d and  tailed %s' % (BACKFILL_EMITS, tailed_records))
+    assert (BACKFILL_EMITS == tailed_records)
 
 
 #
 #
-#   test against simpe tail
+#   test against simple tail
 #
 
 def test_tail():
@@ -190,7 +200,7 @@ def test_tail():
             super(SimpleLogger, self).__init__()
 
         def emit(self, count):
-            open(log_file_path, 'a').write("%08d. %s\n" % (count, 'x' * 64))
+            open(log_file_path, 'ab').write("%08d. %s\n" % (count, 'x' * 64))
             time.sleep(0.1)
 
     loggen_thread = SimpleLogger()
@@ -235,11 +245,58 @@ def test_tail():
     tailer.state = tailer.STOPPED
     tailer_thread.join()
     six.print_('tailer stopped')
+    cmp_files(log_file_path, copy_dir, lambda x: str(Tailer.make_sig(x)))
 
-    dst_file_path = os.path.join(copy_dir, str(Tailer.make_sig(log_file_path)))
-    diff = list(difflib.ndiff(open(log_file_path, 'U').readlines(), open(dst_file_path, 'U').readlines()))
-    six.print_(diff)
-    assert (open(log_file_path).read() == open(dst_file_path).read())
+
+#
+#
+#   test file drop senario
+#
+
+
+def test_file_drop():
+    drop_file_name = 'drop_file.txt'
+    src_file = os.path.join(tempfile.mkdtemp(prefix='test_file_drop-src'), drop_file_name)
+    dst_file = os.path.join(tempfile.mkdtemp(prefix='test_file_drop-dst'), drop_file_name)
+
+    def tail_writer():
+        while True:
+            file_name, checkpoint, record = yield ()
+            open(dst_file, 'ab').write(record)
+
+    consumer = tail_writer()
+    consumer.send(None)
+    tailer = Tailer()
+    six.print_("start watch for drop file:", src_file)
+    six.print_("will save to:", dst_file)
+    tailer_thread = threading.Thread(target=tailer.run, args=(src_file, consumer))
+    tailer_thread.start()
+    tailer_thread.join(10)
+
+    def file_drop(num_lines=250):
+        with open(src_file, 'wb') as dump:
+            for count in range(num_lines):
+                dump.write("%08d. %s\n" % (count + 1, 'x' * 64))
+
+    dump_thread = threading.Thread(target=file_drop)
+    dump_thread.start()
+    dump_thread.join()
+    six.print_('file dropped')
+    tailer_thread.join(10)
+
+    while True:
+        six.print_('checking for drop file ingest')
+        if tailer.state == tailer.WAITING and os.path.exists(dst_file):
+            break
+        time.sleep(1)
+
+    six.print_('pickup complete')
+    six.print_('stop tailer')
+    tailer.state = tailer.STOPPED
+    tailer_thread.join()
+    six.print_('tailer stopped')
+    assert (open(src_file, 'rb').read() == open(dst_file, 'rb').read())
+    cmp_files(src_file, dst_file, lambda x: x)
 
 
 #
@@ -247,23 +304,27 @@ def test_tail():
 #   test against rotating log
 #
 
-
 def test_rotating_log():
     tmp_dir = tempfile.mkdtemp(prefix='tail-test')
     log_file_path = os.path.join(tmp_dir, 'file.log')
     six.print_(log_file_path)
 
+    class FastRotate(RotatingWithDelayFileHandler):
+        EMIT_DELAY = 0.3
+        ROLL_DELAY = 4
+
     class RotatingLogger(Logger):
+
         def __init__(self):
             self.RUNNING = False
             self.logger = logging.getLogger(__file__)
-            handler = RotatingWithDelayFileHandler(log_file_path, maxBytes=2048,
-                                                   backupCount=100)
+            handler = FastRotate(log_file_path, maxBytes=2048,
+                                 backupCount=100)
             self.logger.addHandler(handler)
             super(RotatingLogger, self).__init__()
 
         def emit(self, count):
-            self.logger.error("%08d. %s", count, 'x' * 64)
+            self.logger.error("%08d. %s", count, 'x' * 256)
 
     loggen_thread = RotatingLogger()
     loggen_thread.start()
@@ -278,11 +339,11 @@ def test_rotating_log():
 
     consumer = gx()
     consumer.send(None)
-    tailer = Tailer(only_backfill=False)
+    tailer = Tailer(only_backfill=False, read_pause=2)
     tailer_thread = threading.Thread(target=tailer.run, args=(os.path.join(tmp_dir, '*'), consumer))
 
-    tailer_lag = 40
-    logger_run = 60
+    tailer_lag = 20
+    logger_run = 40
     loggen_thread.join(tailer_lag)
     six.print_('logger run more than %d secs, start tailer' % tailer_lag)
     tailer_thread.start()
@@ -299,8 +360,9 @@ def test_rotating_log():
     six.print_('wait for tailer to idle')
     copy_pattern = os.path.join(copy_dir, '*')
     while True:
-        six.print_('log files %d == files processed %d' % (len(log_files), len(glob.glob(copy_pattern))))
-        if tailer.state == tailer.WAITING and len(log_files) == len(glob.glob(copy_pattern)):
+        six.print_('log files %d == files processed %d --> %s' % (len(log_files), len(glob.glob(copy_pattern)),
+                                                                  tailer.state))
+        if tailer.state == tailer.WAITING and len(log_files) <= len(glob.glob(copy_pattern)):
             break
         time.sleep(1)
     six.print_('stop tailer')
@@ -312,6 +374,8 @@ def test_rotating_log():
         dst_file_path = os.path.join(copy_dir, str(Tailer.make_sig(src_file_path)))
         assert (open(src_file_path).read() == open(dst_file_path).read())
 
+        # cmp_files(tmp_dir, copy_dir, lambda x: str(Tailer.make_sig(x)))
+
 
 if __name__ == '__main__':
-    test_multiline_records()
+    test_rotating_log()

@@ -60,8 +60,8 @@ setup(
         'tail', 'watch', 'logs',
     ],
     install_requires=[
-        # 'aspectlib==1.1.1',
-        'six',
+        'regex==2016.4.8',
+        'six==1.10.0'
     ],
     extras_require={
         # eg:
