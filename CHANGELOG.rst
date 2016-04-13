@@ -14,3 +14,8 @@ Changelog
 * add --start-of-record-re option for multi-line records. - #4
 * move argparser definition  from cli to Tailer class. - #5
 
+0.1.3 (2016-04-12)
+--------------------
+
+* Added break tail tests and fixes drived from it -  #6
+* fixed app description ! - #7

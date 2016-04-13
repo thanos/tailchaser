@@ -5,6 +5,7 @@ import logging.handlers
 import os
 import tempfile
 import threading
+import thread
 import time
 
 import six
@@ -219,8 +220,8 @@ def test_tail():
     tailer = Tailer(only_backfill=False)
     tailer_thread = threading.Thread(target=tailer.run, args=(log_file_path, consumer))
 
-    tailer_lag = 40
-    logger_lag = 80
+    tailer_lag = 30
+    logger_lag = 60
     loggen_thread.join(tailer_lag)
     six.print_('logger run more than %d secs, start tailer' % tailer_lag)
     tailer_thread.start()
@@ -246,6 +247,87 @@ def test_tail():
     tailer_thread.join()
     six.print_('tailer stopped')
     cmp_files(log_file_path, copy_dir, lambda x: str(Tailer.make_sig(x)))
+
+
+
+
+
+def test_tail_with_break():
+    tmp_dir = tempfile.mkdtemp(prefix='tail-test')
+    log_file_path = os.path.join(tmp_dir, 'file.log')
+    six.print_(log_file_path)
+
+    class SimpleLogger(Logger):
+        def __init__(self):
+            self.RUNNING = False
+            super(SimpleLogger, self).__init__()
+
+        def emit(self, count):
+            open(log_file_path, 'ab').write("%08d. %s\n" % (count, 'x' * 64))
+            time.sleep(0.1)
+
+
+    class BreakingTailer(Tailer):
+        def __init__(self):
+            super(BreakingTailer, self).__init__(only_backfill=False)
+            self.interupt =  threading.Event()
+
+        def handoff(self, file_tailed, checkpoint, record, receiver=None):
+            if self.interupt.is_set():
+                raise SystemExit()
+            super(BreakingTailer, self).handoff(file_tailed, checkpoint, record, receiver)
+
+    loggen_thread = SimpleLogger()
+    loggen_thread.start()
+    six.print_('logger started')
+    copy_dir = tempfile.mkdtemp(prefix='tail-test')
+    six.print_(copy_dir)
+
+    def gx():
+        while True:
+            record = yield ()
+            open(os.path.join(copy_dir, os.path.basename(record[0])), 'ab').write(record[2])
+
+    consumer = gx()
+    consumer.send(None)
+    tailer = BreakingTailer()
+    tailer_thread = threading.Thread(target=tailer.run, args=(log_file_path, consumer))
+    tailer_lag = 40
+    logger_lag = 80
+    loggen_thread.join(tailer_lag)
+    six.print_('logger run more than %d secs, start tailer' % tailer_lag)
+    tailer_thread.start()
+    six.print_('tail started')
+    six.print_('run logger %d secs more' % (logger_lag - tailer_lag))
+    loggen_thread.join(logger_lag - tailer_lag-20)
+    six.print_('stopping tailer')
+    tailer.interupt.set()
+    six.print_('waiting for tailer to stop')
+    loggen_thread.join(5)
+    six.print_('tailer stoped - staring again')
+    tailer = BreakingTailer()
+    tailer_thread = threading.Thread(target=tailer.run, args=(log_file_path, consumer))
+    tailer_thread.start()
+    loggen_thread.join(logger_lag - tailer_lag)
+    loggen_thread.RUNNING = False
+    if loggen_thread.is_alive():
+        loggen_thread.join()
+    six.print_('logger stopped')
+    tailer_thread.join(10)
+    six.print_('wait for tailer to idle')
+    log_files = glob.glob(os.path.join(tmp_dir, '*'))
+    copy_pattern = os.path.join(copy_dir, '*')
+    while True:
+        six.print_('log files %d == files processed %d' % (len(log_files), len(glob.glob(copy_pattern))))
+        if tailer.state == tailer.WAITING and len(log_files) == len(glob.glob(copy_pattern)):
+            break
+        time.sleep(1)
+    six.print_('stop tailer')
+    tailer.state = tailer.STOPPED
+    tailer_thread.join()
+    six.print_('tailer stopped')
+    cmp_files(log_file_path, copy_dir, lambda x: str(Tailer.make_sig(x)))
+
 
 
 #
@@ -378,4 +460,4 @@ def test_rotating_log():
 
 
 if __name__ == '__main__':
-    test_rotating_log()
+    test_tail_with_break()

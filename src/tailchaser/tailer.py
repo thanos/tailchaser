@@ -308,7 +308,7 @@ class Tailer(object):
     @classmethod
     def build_arg_parser(cls, parser=None):
         if not parser:
-            parser = argparse.ArgumentParser(description='Process some integers.')
+            parser = argparse.ArgumentParser(description='The ultimate tailer.')
         parser.add_argument('--windows', action='store_true', default=Tailer.is_windows(),
                             help='run as if the platform is windows, default: %s' % Tailer.is_windows())
         parser.add_argument('file-pattern',
