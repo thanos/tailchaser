@@ -54,7 +54,7 @@ class Tailer(object):
     READ_PAUSE = 1
     TMP_DIR = None
     ONLY_BACKFILL = False
-
+    INIT_CHECKPOINT = ('', 0, 0)
     STARTING = 'STARTING'
     STOPPED = 'STOPPED'
     RUNNING = 'RUNNING'
@@ -267,7 +267,7 @@ class Tailer(object):
             return sig, mtime, offset
         except (IOError, EOFError):
             log.debug('failed to load: %s', checkpoint_filename)
-            return '', 0, 0
+            return cls.INIT_CHECKPOINT
 
     def save_checkpoint(self, checkpoint):
         log.debug('dumping %s %s', self.config.checkpoint_filename, checkpoint)
