@@ -267,7 +267,7 @@ class Tailer(object):
             return sig, mtime, offset
         except (IOError, EOFError):
             log.debug('failed to load: %s', checkpoint_filename)
-            return cls.INIT_CHECKPOINT
+            return self.INIT_CHECKPOINT
 
     def save_checkpoint(self, checkpoint):
         log.debug('dumping %s %s', self.config.checkpoint_filename, checkpoint)
