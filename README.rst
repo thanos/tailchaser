@@ -194,16 +194,17 @@ Example 2 - Tailchase to  Kafka
     #
     # Example 2 - Tail to Kafka - shows how to add your own arguments and then send messages to kafka.
     #
-    import msgpack
-    import tailchaser
-    from kafka import KafkaProducer
 
-    class TailToKafka(tailchaser.Tailer):
+    from kafka import KafkaProducer
+    rom tailchaser.tailer import Tailer
+    
+    
+    class TailToKafka(Tailer):
         def add_arguments(cls, parser=None):
             parser = super(TailToKafka, cls).add_arguments(parser)
 
         HOSTS = 'localhost:1234'
-        TOPIC = 'log'
+        TOPIC = b'log'
         def startup(self):
             self.kafka_producer = KafkaProducer(bootstrap_servers=self.HOSTS,value_serializer=msgpack.dumps)
 
@@ -218,6 +219,51 @@ Example 2 - Tailchase to  Kafka
             self.kafka_producer.send(self.TOPIC, record).get(timeout=10)
             return True
              
+
+
+Example 3 - Saving and Loading last Offset from Zookeeper 
+---------------------------------------------------------
+
+::
+
+    #
+    # Example 3 - Saving and Loading last Offset from Zookeeper 
+    #
+    import platform
+    import pickle
+    import six
+    from kazoo.client import KazooClient
+    from tailchaser.tailer import Tailer
+
+    class TailToElastic(Tailer):
+        def start(self):
+            self.zk = KazooClient(hosts=self.config.zookeeper_host)
+            self.zk.start()
+            
+            
+        def stop():
+            self.zk.stop()
+            
+        def load_checkpoint(self):
+            zk_path = self.config.checkpoint_filename
+            try:
+                checkpoint = pickle.loads(self.zk.get(zk_path))
+                log.debug('loaded: %s %s', zk_path, checkpoint)
+                return checkpoint
+            except (IOError, EOFError):
+                log.debug('failed to load: %s', zk_path)
+                return self.INIT_CHECKPOINT
+
+        def save_checkpoint(self, checkpoint):
+            log.debug('dumping %s %s', self.config.checkpoint_filename, checkpoint)
+            return self.zk.set(self.config.checkpoint_filename, six.b(pickle.dumps(checkpoint)))
+
+
+        @staticmethod
+        def make_checkpoint_filename(source_pattern, path=None):
+            zk_path =  '/'.join(['tailchase', platform.node(), slugify(source_pattern)]
+            self.zk.ensure_path(zk_path)
+            return zk_path
 
 
 Documentation
