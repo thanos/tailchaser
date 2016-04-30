@@ -121,7 +121,7 @@ class Tailer(object):
                             else:
                                 producer = self.tail(file_info)
                             for file_tailed, checkpoint, record in producer:
-                                self.handoff(file_tailed, checkpoint, record, receiver)
+                                self.handoff(file_info[0], checkpoint, record, receiver)
                                 self.save_checkpoint(checkpoint)
                                 if not (self.config.only_backfill or is_backfill) and self.config.read_period:
                                     time_spent = time.time() - ticks

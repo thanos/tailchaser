@@ -141,7 +141,7 @@ def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_
         def consumer_gen():
             while True:
                 record = yield ()
-                open(os.path.join(tail_to_dir, os.path.basename(record[0])), 'ab').write(record[2])
+                open(os.path.join(tail_to_dir, record[1][0]), 'ab').write(record[2])
 
         consumer = consumer_gen()
         consumer.send(None)
@@ -174,7 +174,7 @@ def test_multiline_records():
         while True:
             record = yield ()
             tailed_records += 1
-            open(os.path.join(path, os.path.basename(record[0])), 'ab').write(record[2])
+            open(os.path.join(path, record[1][0]), 'ab').write(record[2])
 
     consumer = consumer_gen(tail_to_dir)
     consumer.send(None)
@@ -213,7 +213,7 @@ def test_tail():
     def gx():
         while True:
             record = yield ()
-            open(os.path.join(copy_dir, os.path.basename(record[0])), 'ab').write(record[2])
+            open(os.path.join(copy_dir, record[1][0]), 'ab').write(record[2])
 
     consumer = gx()
     consumer.send(None)
@@ -286,7 +286,7 @@ def test_tail_with_break():
     def gx():
         while True:
             record = yield ()
-            open(os.path.join(copy_dir, os.path.basename(record[0])), 'ab').write(record[2])
+            open(os.path.join(copy_dir, record[1][0]), 'ab').write(record[2])
 
     consumer = gx()
     consumer.send(None)
@@ -417,7 +417,7 @@ def test_rotating_log():
     def gx():
         while True:
             record = yield ()
-            open(os.path.join(copy_dir, os.path.basename(record[0])), 'ab').write(record[2])
+            open(os.path.join(copy_dir, record[1][0]), 'ab').write(record[2])
 
     consumer = gx()
     consumer.send(None)
@@ -460,4 +460,4 @@ def test_rotating_log():
 
 
 if __name__ == '__main__':
-    test_file_drop()
+    test_backfill()
