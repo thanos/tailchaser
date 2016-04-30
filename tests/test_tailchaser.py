@@ -460,4 +460,4 @@ def test_rotating_log():
 
 
 if __name__ == '__main__':
-    test_tail_with_break()
+    test_file_drop()

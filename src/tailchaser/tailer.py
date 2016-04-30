@@ -92,12 +92,16 @@ class Tailer(object):
     def shutdown(self):
         pass
 
-    def at_eof(self):
-        pass
+    def at_eof(self, tmp_file,  is_backfill_file_info):
+        if is_backfill_file_info:
+            is_backfill, (file_tailed, (fid, mtime, offset)) = is_backfill_file_info
+            if is_backfill and tmp_file != file_tailed:
+                os.unlink(tmp_file)
 
     def run(self, source_pattern, receiver=None):
         self.startup()
         self.config.checkpoint_filename = self.make_checkpoint_filename(source_pattern)
+        file_tailed = None
         if self.config.clear_checkpoint and os.path.exists(self.config.checkpoint_filename):
             os.unlink(self.config.checkpoint_filename)
         file_info = 'Not Assigned'
@@ -131,7 +135,7 @@ class Tailer(object):
                 except:
                     raise
                 time.sleep(1)
-                self.at_eof()
+                self.at_eof(file_tailed, is_backfill_file_info)
         finally:
             self.shutdown()
 
