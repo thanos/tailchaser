@@ -23,7 +23,7 @@ def read(*names, **kwargs):
 
 setup(
     name='tailchaser',
-    version='0.2.0',
+    version='0.2.1',
     license='BSD',
     description='the ultimate tailer',
     long_description='%s\n%s' % (
