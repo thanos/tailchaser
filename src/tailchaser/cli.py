@@ -17,7 +17,7 @@ Why does this file exist, and why not put this in __main__?
 import logging
 import sys
 
-from tailer import Tailer
+from .tailer import Tailer
 
 log = logging.getLogger(__name__)
 
