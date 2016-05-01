@@ -5,7 +5,6 @@ import logging.handlers
 import os
 import tempfile
 import threading
-import thread
 import time
 
 import six
