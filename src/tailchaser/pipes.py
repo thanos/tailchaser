@@ -1,52 +1,48 @@
-# -*- coding: utf-8 -*-
-# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
-#
-# $Id$
-#
-# Developer: Thanos Vassilakis
-
-
-import logging
+import re
 import sys
 
-log = logging.getLogger(__name__)
 
+class Node(object):
+    def __init__(self, config, *args, **kwargs):
+        self.config = self.configure(config)
 
-def producer(func):
-    def produce_func(s):
-        for item in s:
-            yield func(item)
+    def configure(self, config):
+        return config
 
-    return produce_func
+    def receive(self, receiver=None):
+        if receiver:
+            receiver.next()
+        return self.run(receiver)
 
-
-def consumer(func):
-    def start(*args, **kwargs):
-        c = func(*args, **kwargs)
-        c.next()
-        return c
-
-    return start
-
-
-class Reader(object):
-    def __init__(self, *args, **kwargs):
-        self.source = args[0]
-
-    def process(self, receiver):
-        receiver.next()
+    def run(self, receiver):
         while True:
-            buff = self.source.read(1000)
-            if buff:
-                receiver.send(buff)
+            something = (yield)
+            self.send(self.process(something), receiver)
+
+    def process(self, something):
+        return something
+
+    def send(self, something, receiver):
+        receiver.send(something)
 
 
-class CollectLines(object):
-    def __init__(self, *args, **kwargs):
+class Reader(Node):
+    def __init__(self, config, *args, **kwargs):
+        super(Reader, self).__init__(config, *args, **kwargs)
+        self.source = self.config['SOURCE']
+
+    def run(self, receiver):
+        while True:
+            something = self.source.read(10000)
+            self.send(self.process(something), receiver)
+
+
+class CollectLines(Node):
+    def __init__(self, config, *args, **kwargs):
+        super(CollectLines, self).__init__(config, *args, **kwargs)
         self.count = 0
 
-    def process(self, receiver):
-        receiver.next()
+    def run(self, receiver):
         while True:
             buff = (yield)
             if buff:
@@ -55,24 +51,57 @@ class CollectLines(object):
                     if indx == -1:
                         break
                     self.count += 1
-                    receiver.send("%08d: " % self.count)
-                    receiver.send(buff[:indx + 1])
+                    self.send(buff[:indx + 1], receiver)
                     buff = buff[indx + 1:]
-                receiver.send(buff)
+                self.send(buff, receiver)
 
 
-class Printer(object):
-    def __init__(self, *args, **kwargs):
-        pass
+class CollectRecords(Node):
+    def __init__(self, config, *args, **kwargs):
+        super(CollectRecords, self).__init__(config, *args, **kwargs)
+        self.count = 0
 
-    def process(self):
+    def run(self, receiver):
+        buff = ''
+        first_record = True
+        e = 0
+        s = 0
         while True:
-            buff = (yield)
-            sys.stdout.write(buff)
+            buff += (yield)
+            if buff:
+                while True:
+                    match = self.config['SOR_RE'].search(buff, e - s)
+                    if not match:
+                        break
+                    s, e = match.span(0)
+                    if first_record:
+                        first_record = False
+                        continue
+                    self.send(buff[:s], receiver)
+                    buff = buff[s:]
+                    if not buff:
+                        break
+            self.send(buff, receiver)
+
+    def send(self, something, receiver):
+        self.count += 1
+        super(CollectRecords, self).send("%000d->" % self.count, receiver)
+        super(CollectRecords, self).send(something, receiver)
+
+
+class Printer(Node):
+    def send(self, something, receiver):
+        if something:
+            sys.stdout.write(something)
+
+
+class System(object):
+    def wire_up(self, *nodes, **config):
+        if nodes:
+            return nodes[0](config).receive(self.wire_up(*nodes[1:], **config))
 
 
 if __name__ == '__main__':
-    import StringIO
-
-    f = StringIO.StringIO()
-    Reader(open(__file__)).process(CollectLines().process(Printer().process()))
+    System().wire_up(Reader, CollectRecords, Printer,
+                     SOURCE=open('/var/log/install.log', 'rb'),
+                     SOR_RE=re.compile(r'\w+\s+\d+\s+\d\d:\d\d:\d\d'))
