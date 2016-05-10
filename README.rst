@@ -34,6 +34,15 @@ Overview
 .. |codecov| image:: https://codecov.io/github/thanos/tailchaser/coverage.svg?branch=master
     :alt: Coverage Status
     :target: https://codecov.io/github/thanos/tailchaser
+    
+
+.. |landscape| image:: https://landscape.io/github/thanos/python-configurator/master/landscape.svg?style=flat
+    :target: https://landscape.io/github/thanos/python-configurator/master
+    :alt: Code Quality Status
+
+.. |codeclimate| image:: https://codeclimate.com/github/thanos/python-configurator/badges/gpa.svg
+   :target: https://codeclimate.com/github/thanos/python-configurator
+   :alt: CodeClimate Quality Status
 
 .. |version| image:: https://img.shields.io/pypi/v/tailchaser.svg?style=flat
     :alt: PyPI Package latest release
