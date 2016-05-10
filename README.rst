@@ -11,7 +11,7 @@ Overview
       - |docs|
     * - tests
       - | |travis|  |requires|
-        | |codecov|  | |landscape| |codeclimate|
+        | |codecov| |landscape| |codeclimate|
     * - package
       - |version| |downloads| |wheel| |supported-versions| |supported-implementations|
 
