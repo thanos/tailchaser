@@ -36,12 +36,12 @@ Overview
     :target: https://codecov.io/github/thanos/tailchaser
     
 
-.. |landscape| image:: https://landscape.io/github/thanos/python-configurator/master/landscape.svg?style=flat
-    :target: https://landscape.io/github/thanos/python-configurator/master
+.. |landscape| image:: https://landscape.io/github/thanos/tailchaser/master/landscape.svg?style=flat
+    :target: https://landscape.io/github/thanos/tailchaser/master
     :alt: Code Quality Status
 
-.. |codeclimate| image:: https://codeclimate.com/github/thanos/python-configurator/badges/gpa.svg
-   :target: https://codeclimate.com/github/thanos/python-configurator
+.. |codeclimate| image:: https://codeclimate.com/github/thanos/tailchaser/badges/gpa.svg
+   :target: https://codeclimate.com/github/thanos/tailchaser
    :alt: CodeClimate Quality Status
 
 .. |version| image:: https://img.shields.io/pypi/v/tailchaser.svg?style=flat
