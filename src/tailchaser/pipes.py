@@ -2,6 +2,14 @@ import re
 import sys
 
 
+
+class Args(object):
+    def __init__(self, *positional, **optional):
+        self.positional = positional
+        self.optional = optional
+        
+        
+
 class Node(object):
     def __init__(self, system):
         self.system = system
