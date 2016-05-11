@@ -11,7 +11,7 @@ Overview
       - |docs|
     * - tests
       - | |travis|  |requires|
-        | |codecov|
+        | |codecov| |landscape| |codeclimate|
     * - package
       - |version| |downloads| |wheel| |supported-versions| |supported-implementations|
 
@@ -34,6 +34,15 @@ Overview
 .. |codecov| image:: https://codecov.io/github/thanos/tailchaser/coverage.svg?branch=master
     :alt: Coverage Status
     :target: https://codecov.io/github/thanos/tailchaser
+    
+
+.. |landscape| image:: https://landscape.io/github/thanos/tailchaser/master/landscape.svg?style=flat
+    :target: https://landscape.io/github/thanos/tailchaser/master
+    :alt: Code Quality Status
+
+.. |codeclimate| image:: https://codeclimate.com/github/thanos/tailchaser/badges/gpa.svg
+   :target: https://codeclimate.com/github/thanos/tailchaser
+   :alt: CodeClimate Quality Status
 
 .. |version| image:: https://img.shields.io/pypi/v/tailchaser.svg?style=flat
     :alt: PyPI Package latest release
