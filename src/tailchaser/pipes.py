@@ -35,14 +35,11 @@ class Node(object):
 
 
 class Reader(Node):
-    def __init__(self, config, *args, **kwargs):
-        super(Reader, self).__init__(config, *args, **kwargs)
-        self.source = self.config['SOURCE']
-
     def run(self, receiver):
         while True:
-            something = self.source.read(10000)
+            something = self.config('SOURCE').read(10000)
             self.send(self.process(something), receiver)
+
 
 
 class CollectLines(Node):
