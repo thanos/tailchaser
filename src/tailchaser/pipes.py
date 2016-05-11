@@ -3,11 +3,19 @@ import sys
 
 
 class Node(object):
-    def __init__(self, config, *args, **kwargs):
-        self.config = self.configure(config)
+    def __init__(self, system):
+        self.system = system
+        self.settings = self.configure(self.system.config)
 
-    def configure(self, config):
-        return config
+    @classmethod
+    def args(cls):
+        return ()
+
+    def configure(self, args):
+        return args
+
+    def config(self, key):
+        return self.settings[key]
 
     def receive(self, receiver=None):
         if receiver:
