@@ -23,7 +23,6 @@ __version__ = "0.2.4"
 
 log = logging.getLogger(__name__)
 
-
 class Args(object):
     def __init__(self, *positional, **optional):
         self.positional = positional
