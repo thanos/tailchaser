@@ -19,7 +19,7 @@ import requests
 
 
 __author__ = 'Thanos Vassilakis'
-
+__version__ = "0.2.4"
 
 log = logging.getLogger(__name__)
 
