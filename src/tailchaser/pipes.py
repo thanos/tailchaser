@@ -19,9 +19,10 @@ import requests
 
 
 __author__ = 'Thanos Vassilakis'
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 log = logging.getLogger(__name__)
+
 
 class Args(object):
     def __init__(self, *positional, **optional):
