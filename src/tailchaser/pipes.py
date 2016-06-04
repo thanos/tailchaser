@@ -31,11 +31,11 @@ class Args(object):
 
 
 class System(object):
-    CONFIG_ENDPOINT = None
+    CONFIG_ENDPOINT = ""
 
     def args(self):
         return (
-            Args('--config_endpoint',
+            Args('--config-endpoint',
                  default=self.CONFIG_ENDPOINT,
                  help='overrides default hostname for central, %s. Add port if needed like this: some_host:8000'
                       % self.CONFIG_ENDPOINT),
@@ -67,9 +67,11 @@ class System(object):
         #     args = node.configure(args)
 
         if args['config_endpoint']:
-            url = args['config_endpoint'] % args
+            url = args['config_endpoint'].format(**args)
             args.update(requests.get(url, params=self.config_params(args)).json())
         self.config.update(args)
+        logging_level = getattr(logging, args.pop('logging'))
+        logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging_level)
         return self
 
     def config_params(self, args):
