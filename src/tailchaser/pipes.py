@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
-#
-# $Id$
-#
-# Developer: Thanos Vassilakis
 import argparse
 import getpass
 import logging
@@ -16,7 +10,6 @@ try:
 except ImportError:
     import re as regex
 import requests
-
 
 __author__ = 'Thanos Vassilakis'
 __version__ = "0.2.6"
@@ -31,6 +24,11 @@ class Args(object):
 
 
 class System(object):
+    """
+    Reads for stderr records defined by start_of_record_RE and wraps the records
+
+    version: %s
+    """
     CONFIG_ENDPOINT = ""
 
     def args(self):
@@ -49,9 +47,10 @@ class System(object):
         self.host = platform.node()
         self.user = getpass.getuser()
 
-    def configure(self, *nodes):
+    def configure(self, *nodes, **kwargs):
         self.nodes = nodes
-        parser = argparse.ArgumentParser(description=self.__doc__ % __version__,
+        doc = self.__doc__ if self.__doc__ else '%s'
+        parser = argparse.ArgumentParser(description=doc % __version__,
                                          formatter_class=argparse.RawDescriptionHelpFormatter, )
 
         for args in self.args():
@@ -61,16 +60,17 @@ class System(object):
                 if args:
                     parser.add_argument(*args.positional, **args.optional)
 
-        args = vars(parser.parse_args())
+        if not kwargs:
+            kwargs = vars(parser.parse_args())
         # self.config = args
         # for node in nodes:
         #     args = node.configure(args)
 
-        if args['config_endpoint']:
-            url = args['config_endpoint'].format(**args)
-            args.update(requests.get(url, params=self.config_params(args)).json())
-        self.config.update(args)
-        logging_level = getattr(logging, args.pop('logging'))
+        if kwargs['config_endpoint']:
+            url = kwargs['config_endpoint'].format(**kwargs)
+            args.update(requests.get(url, params=self.config_params(kwargs)).json())
+        self.config.update(kwargs)
+        logging_level = getattr(logging, kwargs.pop('logging'))
         logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging_level)
         return self
 
@@ -125,6 +125,8 @@ class Reader(Node):
     def run(self, receiver):
         while True:
             something = self.config('SOURCE').read(10000)
+            if not something:
+                break
             self.send(self.process(something), receiver)
 
 
@@ -187,92 +189,11 @@ class CollectRecords(Node):
                         break
         self.send(buff, receiver)
 
-class ExtractFields(pipe.Node):
-    def __init__(self, config, *args, **kwargs):
-        super(ExtractFields, self).__init__(config, *args, **kwargs)
-        self.count = 0
-        
-    @classmethod
-    def args(self):
-        return (
-            pipe.Args('--field-extraction-re', default=None,
-                      help='use this regex expresion to  to extracty fields from the record, default: None'),
-        )
-
-    def configure(self, config):
-        config['field_extraction_re'] = regex.compile(config['field_extraction_regex']) if config[
-            'field_extraction_regex'] else None
-        field_extraction_src = config.get('field_extraction_code','').replace('\r', '')
-        if field_extraction_src:
-            field_extraction_code = compile(field_extraction_src, "<source>", "exec")
-            self.override_record_processor(field_extraction_code)
-        return config
-
-    def init_message(self, record):
-        return {}
-
-    def extract_timestamp(self, extracted_fields):
-        timestamp_str = None
-        if 'timestamp' in extracted_fields:
-            timestamp_str = extracted_fields.pop('timestamp')
-        else:
-            for fstr in self.DATE_FMT_STRS:
-                try:
-                    timestamp_str = fstr.format(**extracted_fields)
-                    break
-                except:
-                    continue
-            if not timestamp_str:
-                TimestampError('Failed to extract timestamp')
-        return date_parse(timestamp_str)
-
-    def extract_fields(self, record):
-        extracted_fields = {}
-        match = self.system.config['field_extraction_re'].search(record)
-        if match:
-            extracted_fields.update(match.groupdict())
-        return extracted_fields
-
-    def override_record_processor(self, field_extraction_code):
-        record_processor = None
-        exec field_extraction_code
-        self.record_processor = types.MethodType(record_processor, self)
-
-    def record_processor(self, raw_record, extracted_fields, *args, **kwa):
-        if not extracted_fields:
-            raise FailedToParse()
-        return extracted_fields
-
-    def process(self, record):
-        self.count += 1
-        extracted_fields = self.extract_fields(record)
-        message = self.init_message(record)
-        try:
-            message.update(self.record_processor(record, extracted_timestamp, extracted_fields))
-            return 'ok', message
-        except KeyboardInterrupt:
-            raise
-        except UnicodeDecodeError, e:
-            log.warn('UnicodeDecodeError[%s] count: %d, record: %s, message: %s', e, self.count repr(record), repr(message))
-        except SystemExit:
-            self.exit_status = 'DONE'
-            raise
-        except SystemError:
-            raise
-        except:
-            log.exception('NO MATCH count: %d, record: %s, message: %s', e, self.count repr(record), repr(message))
-            message['record'] = base64.b64encode(record) if False else record
-            message['exception'] = traceback.format_exc()
-            return 'error', message
-
-    def send(self, something, receiver):
-        super(CollectRecords, self).send(something, receiver)
 
 class Printer(Node):
     def send(self, something, receiver):
         if something:
             sys.stdout.write(something)
-
 
 if __name__ == '__main__':
     System(SOURCE=open('/var/log/install.log', 'rb'),
