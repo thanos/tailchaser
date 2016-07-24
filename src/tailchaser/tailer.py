@@ -60,7 +60,7 @@ class Tailer(object):
     RUNNING = 'RUNNING'
     WAITING = 'WAITING'
     ARGS = ('only_backfill', 'dont_backfill', 'read_period', 'clear_checkpoint',
-            'read_pause', 'temp_dir', 'start_of_record_re')
+            'read_pause', 'temp_dir', 'start_of_record_re', 'filter_re')
 
     def __init__(self,
                  only_backfill=ONLY_BACKFILL,
@@ -70,6 +70,7 @@ class Tailer(object):
                  read_pause=READ_PAUSE,
                  temp_dir=TMP_DIR,
                  start_of_record_re=None,
+                 filter_re=None,
                  windows=None):
 
         self.config = collections.namedtuple('Args', self.ARGS)
@@ -80,6 +81,7 @@ class Tailer(object):
         self.config.read_pause = read_pause
         self.config.temp_dir = temp_dir if temp_dir else tempfile.mkdtemp()
         self.config.windows = windows if windows is not None else self.is_windows()
+        self.config.filter_re = regex.compile(filter_re) if filter_re else None
         if start_of_record_re:
             self.config.start_of_record_re = regex.compile(start_of_record_re)
             self.read_record = self.read_record_with_regex
@@ -91,6 +93,11 @@ class Tailer(object):
 
     def shutdown(self):
         pass
+
+    def filter(self, record):
+        if self.config.filter_re:
+            return self.config.filter_re.search(record) is not None
+        return True
 
     def at_eof(self, tmp_file,  is_backfill_file_info):
         if is_backfill_file_info:
@@ -121,7 +128,8 @@ class Tailer(object):
                             else:
                                 producer = self.tail(file_info)
                             for file_tailed, checkpoint, record in producer:
-                                self.handoff(file_info[0], checkpoint, record, receiver)
+                                if  self.filter(record):
+                                    self.handoff(file_info[0], checkpoint, record, receiver)
                                 self.save_checkpoint(checkpoint)
                                 if not (self.config.only_backfill or is_backfill) and self.config.read_period:
                                     time_spent = time.time() - ticks
@@ -337,6 +345,8 @@ class Tailer(object):
                             help='logging level, default: ERROR')
         parser.add_argument('--start-of-record-re', default=None,
                             help='use this regex expresion to define the start of a record, default: None')
+        parser.add_argument('--filter-re', default=None,
+                            help='use this regex as a positive filter of records, default: None')
         parser.add_argument('--show-config', action='store_true', default=False,
                             help='dump-configuration')
         return parser
