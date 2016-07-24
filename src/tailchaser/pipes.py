@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
-#
-# $Id$
-#
-# Developer: Thanos Vassilakis
 import argparse
 import getpass
 import logging
@@ -16,7 +10,6 @@ try:
 except ImportError:
     import re as regex
 import requests
-
 
 __author__ = 'Thanos Vassilakis'
 __version__ = "0.2.6"
@@ -31,11 +24,16 @@ class Args(object):
 
 
 class System(object):
-    CONFIG_ENDPOINT = None
+    """
+    Reads for stderr records defined by start_of_record_RE and wraps the records
+
+    version: %s
+    """
+    CONFIG_ENDPOINT = ""
 
     def args(self):
         return (
-            Args('--config_endpoint',
+            Args('--config-endpoint',
                  default=self.CONFIG_ENDPOINT,
                  help='overrides default hostname for central, %s. Add port if needed like this: some_host:8000'
                       % self.CONFIG_ENDPOINT),
@@ -49,9 +47,10 @@ class System(object):
         self.host = platform.node()
         self.user = getpass.getuser()
 
-    def configure(self, *nodes):
+    def configure(self, *nodes, **kwargs):
         self.nodes = nodes
-        parser = argparse.ArgumentParser(description=self.__doc__ % __version__,
+        doc = self.__doc__ if self.__doc__ else '%s'
+        parser = argparse.ArgumentParser(description=doc % __version__,
                                          formatter_class=argparse.RawDescriptionHelpFormatter, )
 
         for args in self.args():
@@ -61,15 +60,18 @@ class System(object):
                 if args:
                     parser.add_argument(*args.positional, **args.optional)
 
-        args = vars(parser.parse_args())
+        if not kwargs:
+            kwargs = vars(parser.parse_args())
         # self.config = args
         # for node in nodes:
         #     args = node.configure(args)
 
-        if args['config_endpoint']:
-            url = args['config_endpoint'] % args
-            args.update(requests.get(url, params=self.config_params(args)).json())
-        self.config.update(args)
+        if kwargs['config_endpoint']:
+            url = kwargs['config_endpoint'].format(**kwargs)
+            args.update(requests.get(url, params=self.config_params(kwargs)).json())
+        self.config.update(kwargs)
+        logging_level = getattr(logging, kwargs.pop('logging'))
+        logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging_level)
         return self
 
     def config_params(self, args):
@@ -123,6 +125,8 @@ class Reader(Node):
     def run(self, receiver):
         while True:
             something = self.config('SOURCE').read(10000)
+            if not something:
+                break
             self.send(self.process(something), receiver)
 
 
@@ -190,7 +194,6 @@ class Printer(Node):
     def send(self, something, receiver):
         if something:
             sys.stdout.write(something)
-
 
 if __name__ == '__main__':
     System(SOURCE=open('/var/log/install.log', 'rb'),

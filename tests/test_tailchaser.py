@@ -126,8 +126,38 @@ class MultiLineLogHandler(logging.FileHandler):
 
 TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 
-BACKFILL_EMITS = 50
+filter_count = 0
+def test_filter():
+    work_dir = tempfile.mkdtemp(prefix='tail-test_filter-tail_from_dir')
+    six.print_('generating log files', work_dir)
+    test_file = os.path.join(work_dir, 'test.log')
+    with open(test_file,'wb') as file_to_tail:
+        file_name = file_to_tail.name
+        six.print_('file to tail with filter', file_to_tail)
+        for i in range(1000):
+            if i % 2 == 0:
+                line = "odd: %d\n" % i
+            else:
+                line = "even: %d\n" % i
+            file_to_tail.write(line)
 
+
+
+    def consumer_gen():
+        global filter_count
+        while True:
+            record = yield ()
+            filter_count +=1
+
+
+    consumer = consumer_gen()
+    consumer.send(None)
+    vargs = [__name__, '--only-backfill', '--clear-checkpoint', '--filter-re=odd:\\s*\\d+']
+    vargs.append(test_file)
+    main(vargs, consumer)
+    assert (500 == filter_count)
+
+BACKFILL_EMITS = 50
 
 def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_to_dir=None, vargs=None):
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
@@ -459,4 +489,4 @@ def test_rotating_log():
 
 
 if __name__ == '__main__':
-    test_backfill()
+    test_filter()
