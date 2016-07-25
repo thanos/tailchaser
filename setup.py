@@ -60,8 +60,9 @@ setup(
         'tail', 'watch', 'logs',
     ],
     install_requires=[
-        'regex>=2016.05.13',
-        'six==1.10.0'
+        'regex>=2016.7.21',
+        'six==1.10.0',
+        'requests>=2.10.0',
     ],
     extras_require={
         # eg:

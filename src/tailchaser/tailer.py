@@ -99,7 +99,7 @@ class Tailer(object):
             return self.config.filter_re.search(record) is not None
         return True
 
-    def at_eof(self, tmp_file,  is_backfill_file_info):
+    def at_eof(self, tmp_file, is_backfill_file_info):
         if is_backfill_file_info:
             is_backfill, (file_tailed, (fid, mtime, offset)) = is_backfill_file_info
             if is_backfill and tmp_file != file_tailed:
@@ -128,7 +128,7 @@ class Tailer(object):
                             else:
                                 producer = self.tail(file_info)
                             for file_tailed, checkpoint, record in producer:
-                                if  self.filter(record):
+                                if self.filter(record):
                                     self.handoff(file_info[0], checkpoint, record, receiver)
                                 self.save_checkpoint(checkpoint)
                                 if not (self.config.only_backfill or is_backfill) and self.config.read_period:

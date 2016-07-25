@@ -127,11 +127,13 @@ class MultiLineLogHandler(logging.FileHandler):
 TEST_PATH = os.path.dirname(os.path.abspath(__file__))
 
 filter_count = 0
+
+
 def test_filter():
     work_dir = tempfile.mkdtemp(prefix='tail-test_filter-tail_from_dir')
     six.print_('generating log files', work_dir)
     test_file = os.path.join(work_dir, 'test.log')
-    with open(test_file,'wb') as file_to_tail:
+    with open(test_file, 'wb') as file_to_tail:
         file_name = file_to_tail.name
         six.print_('file to tail with filter', file_to_tail)
         for i in range(1000):
@@ -141,14 +143,11 @@ def test_filter():
                 line = "even: %d\n" % i
             file_to_tail.write(line)
 
-
-
     def consumer_gen():
         global filter_count
         while True:
             record = yield ()
-            filter_count +=1
-
+            filter_count += 1
 
     consumer = consumer_gen()
     consumer.send(None)
@@ -157,7 +156,9 @@ def test_filter():
     main(vargs, consumer)
     assert (500 == filter_count)
 
+
 BACKFILL_EMITS = 50
+
 
 def test_backfill(log_handler=RotatingWithDelayFileHandler, consumer=None, tail_to_dir=None, vargs=None):
     tail_from_dir = tempfile.mkdtemp(prefix='tail-test_backfill-tail_from_dir')
@@ -278,9 +279,6 @@ def test_tail():
     cmp_files(log_file_path, copy_dir, lambda x: str(Tailer.make_sig(x)))
 
 
-
-
-
 def test_tail_with_break():
     tmp_dir = tempfile.mkdtemp(prefix='tail-test')
     log_file_path = os.path.join(tmp_dir, 'file.log')
@@ -295,11 +293,10 @@ def test_tail_with_break():
             open(log_file_path, 'ab').write("%08d. %s\n" % (count, 'x' * 64))
             time.sleep(0.1)
 
-
     class BreakingTailer(Tailer):
         def __init__(self):
             super(BreakingTailer, self).__init__(only_backfill=False)
-            self.interupt =  threading.Event()
+            self.interupt = threading.Event()
 
         def handoff(self, file_tailed, checkpoint, record, receiver=None):
             if self.interupt.is_set():
@@ -328,7 +325,7 @@ def test_tail_with_break():
     tailer_thread.start()
     six.print_('tail started')
     six.print_('run logger %d secs more' % (logger_lag - tailer_lag))
-    loggen_thread.join(logger_lag - tailer_lag-20)
+    loggen_thread.join(logger_lag - tailer_lag - 20)
     six.print_('stopping tailer')
     tailer.interupt.set()
     six.print_('waiting for tailer to stop')
@@ -356,7 +353,6 @@ def test_tail_with_break():
     tailer_thread.join()
     six.print_('tailer stopped')
     cmp_files(log_file_path, copy_dir, lambda x: str(Tailer.make_sig(x)))
-
 
 
 #
