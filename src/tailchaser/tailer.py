@@ -118,7 +118,6 @@ class Tailer(object):
                 try:
                     checkpoint = self.load_checkpoint()
                     is_backfill_file_info = self.next_to_process(source_pattern, checkpoint)
-                    print is_backfill_file_info
                     if is_backfill_file_info:
                         is_backfill, file_info = is_backfill_file_info
                         is_backfill = is_backfill or self.config.only_backfill
@@ -136,8 +135,10 @@ class Tailer(object):
                                     if time_spent > self.config.read_period:
                                         time.sleep(self.config.read_pause)
                                         break
-                    elif self.config.only_backfill:
-                        break
+                    else:
+                        if self.config.only_backfill:
+                            break
+                        time.sleep(3)
                 except KeyboardInterrupt:
                     raise
                 except:
