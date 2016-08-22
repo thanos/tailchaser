@@ -18,7 +18,7 @@ except ImportError:
 import requests
 
 __author__ = 'Thanos Vassilakis'
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 log = logging.getLogger(__name__)
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging.DEBUG)
