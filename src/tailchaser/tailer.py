@@ -100,10 +100,15 @@ class Tailer(object):
         return True
 
     def at_eof(self, tmp_file, is_backfill_file_info):
-        if is_backfill_file_info:
-            is_backfill, (file_tailed, (fid, mtime, offset)) = is_backfill_file_info
-            if is_backfill and tmp_file != file_tailed:
-                os.unlink(tmp_file)
+        try:
+            if is_backfill_file_info:
+                is_backfill, (file_tailed, (fid, mtime, offset)) = is_backfill_file_info
+                if is_backfill and tmp_file != file_tailed:
+                    if os.path.exists(tmp_file):
+                        os.unlink(tmp_file)
+        except (IOError, OSError):
+            log.warning("at_eof failed to remove: %s", tmp_file)
+            
 
     def run(self, source_pattern, receiver=None):
         self.startup()
