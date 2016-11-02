@@ -108,7 +108,6 @@ class Tailer(object):
                         os.unlink(tmp_file)
         except (IOError, OSError):
             log.warning("at_eof failed to remove: %s", tmp_file)
-            
 
     def run(self, source_pattern, receiver=None):
         self.startup()
